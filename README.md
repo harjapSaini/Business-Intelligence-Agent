@@ -1,6 +1,6 @@
-# 🏪 Retail Analytics Agent
+# 🏪 Private Business Intelligence Agent
 
-A local, secure retail analytics web app for Canadian Tire — powered by **Streamlit** and **Ollama (llama3.2:3b)**.  
+A local, secure retail analytics web app for Canadian Tire - powered by **Streamlit** and **Ollama (llama3.2:3b)**.  
 All data stays on your machine. No internet connection required during use.
 
 ---
@@ -12,7 +12,7 @@ All data stays on your machine. No internet connection required during use.
 | Python | 3.11+   | Runtime          |
 | Ollama | latest  | Local LLM server |
 
-> **Note:** Python 3.9 will **not** work — Streamlit requires 3.10+ and this project uses 3.11 features.
+> **Note:** Python 3.9 will **not** work - Streamlit requires 3.10+ and this project uses 3.11 features.
 
 ---
 
@@ -31,7 +31,7 @@ cd Business-Intelligence-Agent
 # Use py launcher to ensure Python 3.11 (not a system default like 3.9)
 py -3.11 -m venv venv
 
-# Activate — pick the command for your shell:
+# Activate - pick the command for your shell:
 # Git Bash (Windows)
 source venv/Scripts/activate
 # CMD
@@ -54,7 +54,7 @@ Download and install from [ollama.com](https://ollama.com), then pull the model:
 ollama pull llama3.2:3b   # download the model (~2 GB)
 ```
 
-> **Windows:** Ollama runs as a background service automatically after installation — no need to run `ollama serve`.  
+> **Windows:** Ollama runs as a background service automatically after installation - no need to run `ollama serve`.  
 > **macOS / Linux:** You may need to run `ollama serve` in a separate terminal first.
 
 ### 5. Run the app
@@ -85,7 +85,7 @@ The app opens at **http://localhost:8501**.
 ## Tech Stack
 
 - **UI**: Streamlit
-- **LLM**: Ollama (llama3.2:3b) — runs 100% locally
+- **LLM**: Ollama (llama3.2:3b) - runs 100% locally
 - **Charts**: Plotly
 - **Forecasting**: scikit-learn (LinearRegression)
 - **Data**: Pandas + openpyxl

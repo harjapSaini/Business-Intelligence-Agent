@@ -1,5 +1,5 @@
 """
-Data loading and KPI calculations for the Retail Analytics Agent.
+Data loading and KPI calculations for the Private Business Intelligence Agent.
 Handles reading the Excel dataset and computing derived columns.
 """
 
@@ -26,7 +26,7 @@ def load_data(path: str) -> pd.DataFrame:
     df["SALES"] = df["SELLING_PRICE_PER_UNIT"] * df["UNITS_SOLD"]
     df["COGS"] = df["COST_PER_UNIT"] * df["UNITS_SOLD"]
     df["MARGIN"] = df["SALES"] - df["COGS"]
-    # Avoid division by zero — fill with 0 where SALES == 0
+    # Avoid division by zero - fill with 0 where SALES == 0
     df["MARGIN_RATE"] = (df["MARGIN"] / df["SALES"]).fillna(0)
 
     return df

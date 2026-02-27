@@ -1,13 +1,13 @@
 """
-Ollama LLM client for the Retail Analytics Agent.
+Ollama LLM client for the Private Business Intelligence Agent.
 
 Handles all communication with the local Ollama server:
-  - verify_ollama()              — check server + model availability
-  - warmup_model()               — pre-load model into memory
-  - build_system_prompt()        — construct the LLM system prompt
-  - extract_json_from_response() — parse JSON from raw LLM output
-  - validate_llm_response()      — fix/default missing keys
-  - ask_llm()                    — single LLM call, returns structured dict
+  - verify_ollama()              - check server + model availability
+  - warmup_model()               - pre-load model into memory
+  - build_system_prompt()        - construct the LLM system prompt
+  - extract_json_from_response() - parse JSON from raw LLM output
+  - validate_llm_response()      - fix/default missing keys
+  - ask_llm()                    - single LLM call, returns structured dict
 """
 
 import json
@@ -93,10 +93,10 @@ def build_system_prompt(df_summary: dict, session_memory: dict = None) -> str:
         session_memory: Current session memory dict (may be None/empty).
 
     Returns:
-        str — the complete system prompt.
+        str - the complete system prompt.
     """
     # Build memory context block
-    memory_block = "No prior context — this is the first question."
+    memory_block = "No prior context - this is the first question."
     if session_memory and any(session_memory.get(k) for k in ["entities", "last_filters", "last_result"]):
         parts = []
         entities = session_memory.get("entities", {})
@@ -119,7 +119,7 @@ def build_system_prompt(df_summary: dict, session_memory: dict = None) -> str:
         if parts:
             memory_block = "\n".join(parts)
 
-    prompt = f"""You are a retail analytics agent for Canadian Tire.
+    prompt = f"""You are a Private Business Intelligence Agent for Canadian Tire.
 You analyze a dataset with {df_summary['total_rows']:,} rows of retail transaction data.
 
 Dataset columns: YEAR, QUARTER, MONTH, DATE, STORE_ID, STORE_NAME, STORE_SIZE, REGION, PRODUCT_ID, BRAND, PRODUCT_CATEGORY, PRODUCT_DIVISION, PRODUCT_NAME, SELLING_PRICE_PER_UNIT, UNITS_SOLD, COST_PER_UNIT
@@ -135,23 +135,23 @@ Available filter values:
 
 You have exactly 5 analysis tools. Pick the ONE best tool for each question:
 
-1. "yoy_comparison" — Use for year-over-year comparisons, growth analysis, performance trends.
+1. "yoy_comparison" - Use for year-over-year comparisons, growth analysis, performance trends.
    Filters: metric, division, region, category, brand (all optional, default metric="sales")
    Triggers: "grew", "vs last year", "year over year", "performance", "top/bottom by", "worst/best"
 
-2. "brand_region_crosstab" — Use for comparing brands across regions, or regional performance by brand.
+2. "brand_region_crosstab" - Use for comparing brands across regions, or regional performance by brand.
    Filters: metric (default "sales")
    Triggers: "brands in region", "regional performance", "cross-tab", "heatmap", "which brands"
 
-3. "forecast_trendline" — Use for projections, trends, forecasts into 2025.
+3. "forecast_trendline" - Use for projections, trends, forecasts into 2025.
    Filters: group_by (one of "division","region","brand","category"), group_value, metric
    Triggers: "project", "forecast", "trend", "trajectory", "predict", "2025"
 
-4. "anomaly_detection" — Use for finding outliers, unusual patterns, anomalies.
+4. "anomaly_detection" - Use for finding outliers, unusual patterns, anomalies.
    Filters: metric (default "margin_rate"), division, region
    Triggers: "anomaly", "outlier", "unusual", "flag", "looks off", "weird"
 
-5. "price_volume_margin" — Use for price-margin-volume relationships, pricing analysis.
+5. "price_volume_margin" - Use for price-margin-volume relationships, pricing analysis.
    Filters: division, category
    Triggers: "price", "pricing", "sweet spot", "price vs margin", "relationship between price"
 
@@ -208,7 +208,7 @@ def extract_json_from_response(raw_text: str) -> dict:
         raw_text: Raw string response from the LLM.
 
     Returns:
-        dict — parsed JSON object.
+        dict - parsed JSON object.
 
     Raises:
         ValueError if no valid JSON can be extracted.
@@ -262,7 +262,7 @@ def validate_llm_response(parsed: dict) -> dict:
         parsed: Dict from JSON parsing.
 
     Returns:
-        dict — validated/corrected response.
+        dict - validated/corrected response.
     """
     result = dict(parsed)
 
@@ -338,7 +338,7 @@ def ask_llm(question: str, session_memory: dict, df_summary: dict) -> dict:
         return validated
 
     except ValueError:
-        # JSON extraction failed — return fallback
+        # JSON extraction failed - return fallback
         return {
             "tool": "yoy_comparison",
             "filters": {"metric": "sales"},
@@ -354,7 +354,7 @@ def ask_llm(question: str, session_memory: dict, df_summary: dict) -> dict:
             ],
         }
     except Exception as e:
-        # Ollama connection or other error — return error fallback
+        # Ollama connection or other error - return error fallback
         return {
             "tool": "yoy_comparison",
             "filters": {"metric": "sales"},

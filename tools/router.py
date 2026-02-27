@@ -1,5 +1,5 @@
 """
-Tool Router — dispatches LLM tool calls to the correct analysis function.
+Tool Router - dispatches LLM tool calls to the correct analysis function.
 """
 
 import pandas as pd
@@ -34,6 +34,8 @@ def tool_router(tool_name: str, filters: dict, df: pd.DataFrame) -> tuple:
         else:
             clean[k] = v
 
+    is_dark = clean.get("_is_dark_mode", False)
+
     if tool_name == "yoy_comparison":
         fig, summary = yoy_comparison(
             df,
@@ -42,6 +44,7 @@ def tool_router(tool_name: str, filters: dict, df: pd.DataFrame) -> tuple:
             region=clean.get("region"),
             category=clean.get("category"),
             brand=clean.get("brand"),
+            _is_dark_mode=is_dark,
         )
         return fig, summary, None
 
@@ -49,6 +52,7 @@ def tool_router(tool_name: str, filters: dict, df: pd.DataFrame) -> tuple:
         fig, summary = brand_region_crosstab(
             df,
             metric=clean.get("metric", "sales"),
+            _is_dark_mode=is_dark,
         )
         return fig, summary, None
 
@@ -58,6 +62,7 @@ def tool_router(tool_name: str, filters: dict, df: pd.DataFrame) -> tuple:
             group_by=clean.get("group_by", "division"),
             group_value=clean.get("group_value"),
             metric=clean.get("metric", "sales"),
+            _is_dark_mode=is_dark,
         )
         return fig, summary, None
 
@@ -67,6 +72,7 @@ def tool_router(tool_name: str, filters: dict, df: pd.DataFrame) -> tuple:
             metric=clean.get("metric", "margin_rate"),
             division=clean.get("division"),
             region=clean.get("region"),
+            _is_dark_mode=is_dark,
         )
         return fig, outlier_df, callouts
 
@@ -75,10 +81,11 @@ def tool_router(tool_name: str, filters: dict, df: pd.DataFrame) -> tuple:
             df,
             division=clean.get("division"),
             category=clean.get("category"),
+            _is_dark_mode=is_dark,
         )
         return fig, summary, None
 
     else:
         # Fallback to YoY comparison with defaults
-        fig, summary = yoy_comparison(df, metric="sales")
+        fig, summary = yoy_comparison(df, metric="sales", _is_dark_mode=is_dark)
         return fig, summary, None

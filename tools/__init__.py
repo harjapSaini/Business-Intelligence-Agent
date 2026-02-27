@@ -1,5 +1,5 @@
 """
-Analysis tools package for the Retail Analytics Agent.
+Analysis tools package for the Private Business Intelligence Agent.
 
 Each tool lives in its own module:
   - yoy_comparison

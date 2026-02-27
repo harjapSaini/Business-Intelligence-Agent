@@ -1,11 +1,11 @@
 """
-🏪 Retail Analytics Agent
-Canadian Tire — Data Science Associate Case Study
+🏪 Private Business Intelligence Agent
+Canadian Tire - Data Science Associate Case Study
 
 A local, secure retail analytics web app powered by Streamlit and
 Ollama (llama3.2:3b). All data stays on-device; no internet needed.
 
-This is the main entry point — run with: streamlit run agent.py
+This is the main entry point - run with: streamlit run agent.py
 """
 
 import streamlit as st
@@ -48,6 +48,9 @@ def init_session_state() -> None:
 
     if "model_warmed" not in st.session_state:
         st.session_state.model_warmed = False
+
+    if "dark_mode" not in st.session_state:
+        st.session_state.dark_mode = False
 
 
 # =====================================================================
@@ -96,7 +99,7 @@ def update_memory(llm_response: dict, result_df=None) -> None:
 #  PROCESS A QUESTION
 # =====================================================================
 
-def process_question(question: str, df, summary: dict) -> None:
+def process_question(question: str, df, summary: dict, is_dark_mode: bool = False) -> None:
     """
     Full pipeline: LLM call → tool routing → memory update → store message.
 
@@ -104,6 +107,7 @@ def process_question(question: str, df, summary: dict) -> None:
         question: The user's natural-language question.
         df:       Full DataFrame with KPI columns.
         summary:  Dataset summary dict.
+        is_dark_mode: Current theme setting for chart templates.
     """
     # Add user message
     st.session_state.messages.append({"role": "user", "content": question})
@@ -118,6 +122,10 @@ def process_question(question: str, df, summary: dict) -> None:
     # Route to the correct tool
     tool_name = llm_response["tool"]
     filters = llm_response["filters"]
+    
+    # Store theme info in filters so router can pass it to tools
+    filters["_is_dark_mode"] = is_dark_mode
+    
     fig, result_df, callouts = tool_router(tool_name, filters, df)
 
     # Update session memory
@@ -141,11 +149,11 @@ def process_question(question: str, df, summary: dict) -> None:
 # =====================================================================
 
 def main():
-    """Entry point — configure page, load data, run chat interface."""
+    """Entry point - configure page, load data, run chat interface."""
 
     # ── Page config (must be first Streamlit call) ──────────
     st.set_page_config(
-        page_title="Retail Analytics Agent",
+        page_title="Private Business Intelligence Agent",
         page_icon="🏪",
         layout="wide",
     )
@@ -154,7 +162,8 @@ def main():
     init_session_state()
 
     # ── Inject custom CSS ───────────────────────────────────
-    inject_custom_css()
+    is_dark = st.session_state.get("dark_mode", False)
+    inject_custom_css(is_dark)
 
     # ── Load data ───────────────────────────────────────────
     df = load_data(DATA_PATH)
@@ -183,7 +192,7 @@ def main():
         question = st.session_state.pending_question
         st.session_state.pending_question = None
         with st.spinner("🔍 Analysing..."):
-            process_question(question, df, summary)
+            process_question(question, df, summary, is_dark)
 
     # ── Render chat history ─────────────────────────────────
     if not st.session_state.messages:
@@ -193,8 +202,8 @@ def main():
             st.session_state.pending_question = clicked
             st.rerun()
     else:
-        for msg in st.session_state.messages:
-            render_chat_message(msg)
+        for idx, msg in enumerate(st.session_state.messages):
+            render_chat_message(msg, msg_idx=idx)
 
         # Show suggestions from last assistant message
         last_msg = st.session_state.messages[-1]
@@ -208,7 +217,7 @@ def main():
     # ── Chat input ──────────────────────────────────────────
     if prompt := st.chat_input("Ask a question about the data..."):
         with st.spinner("🔍 Analysing..."):
-            process_question(prompt, df, summary)
+            process_question(prompt, df, summary, is_dark)
         st.rerun()
 
 

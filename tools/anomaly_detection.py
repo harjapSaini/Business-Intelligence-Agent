@@ -1,5 +1,5 @@
 """
-Tool 4 — Anomaly & Outlier Detection
+Tool 4 - Anomaly & Outlier Detection
 
 Detects anomalous products using Z-score analysis on a chosen metric.
 Flags outliers beyond ±2 standard deviations.
@@ -16,6 +16,7 @@ def anomaly_detection(
     metric: str = "margin_rate",
     division: str = None,
     region: str = None,
+    _is_dark_mode: bool = False,
 ) -> tuple:
     """
     Detect anomalous products using Z-score analysis.
@@ -27,7 +28,7 @@ def anomaly_detection(
         region:   Optional region filter.
 
     Returns:
-        (plotly.Figure, pd.DataFrame, list[str]) — scatter plot with
+        (plotly.Figure, pd.DataFrame, list[str]) - scatter plot with
         outliers in red, outlier table, plain-English callout strings.
     """
     metric_col_map = {
@@ -82,11 +83,13 @@ def anomaly_detection(
         color="label",
         color_discrete_map=ANOMALY_COLORS,
         hover_data=["PRODUCT_CATEGORY", "PRODUCT_DIVISION", "z_score"],
-        title=f"Anomaly Detection — {metric_label}",
+        title=f"Anomaly Detection - {metric_label}",
         labels={col: metric_label},
     )
     fig.update_layout(
-        template="plotly_white",
+        template="plotly_dark" if _is_dark_mode else "plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         xaxis_tickangle=-45,
         font_family="Inter, sans-serif",
         title_font_size=18,

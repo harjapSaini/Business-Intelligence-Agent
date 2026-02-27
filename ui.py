@@ -1,5 +1,5 @@
 """
-UI components for the Retail Analytics Agent.
+UI components for the Private Business Intelligence Agent.
 Sidebar, chat messages, suggestion buttons, and custom styling.
 """
 
@@ -11,8 +11,7 @@ from config import APP_TITLE
 #  CUSTOM CSS STYLING
 # =====================================================================
 
-CUSTOM_CSS = """
-<style>
+COMMON_CSS = """
 /* ── Import Google Fonts ──────────────────────────────────── */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
@@ -28,7 +27,21 @@ html, body, [class*="css"] {
     padding: 0.5rem;
 }
 
-/* ── Suggestion buttons ───────────────────────────────────── */
+/* ── Expander styling ─────────────────────────────────────── */
+.streamlit-expanderHeader {
+    font-size: 0.85rem;
+}
+
+/* ── Spinner overlay ──────────────────────────────────────── */
+.stSpinner > div {
+    border-color: #D32F2F !important;
+}
+"""
+
+CUSTOM_CSS_LIGHT = """
+<style>
+""" + COMMON_CSS + """
+/* ── LIGHT MODE STYLES ────────────────────────────────────── */
 .stButton > button {
     border-radius: 8px;
     border: 1px solid #e0e0e0;
@@ -46,7 +59,6 @@ html, body, [class*="css"] {
     box-shadow: 0 2px 8px rgba(211,47,47,0.15);
 }
 
-/* ──  Tool badge ──────────────────────────────────────────── */
 .tool-badge {
     display: inline-block;
     background: #f0f4f8;
@@ -57,7 +69,6 @@ html, body, [class*="css"] {
     margin-top: 4px;
 }
 
-/* ── Sidebar styling ──────────────────────────────────────── */
 section[data-testid="stSidebar"] {
     background: linear-gradient(180deg, #fafbfc 0%, #f0f4f8 100%);
 }
@@ -66,7 +77,8 @@ section[data-testid="stSidebar"] .stMetric label {
     color: #78909c;
 }
 
-/* ── Welcome hero card ────────────────────────────────────── */
+/* Default streamlit metric and text colors are fine for light mode */
+
 .welcome-card {
     background: linear-gradient(135deg, #fafbfc 0%, #e8f5e9 50%, #fff3e0 100%);
     border-radius: 16px;
@@ -77,6 +89,10 @@ section[data-testid="stSidebar"] .stMetric label {
 .welcome-card h2 {
     margin-top: 0;
     color: #263238;
+}
+.welcome-card-desc {
+    color: #546e7a;
+    font-size: 1.05rem;
 }
 .welcome-card .example-q {
     background: white;
@@ -93,24 +109,145 @@ section[data-testid="stSidebar"] .stMetric label {
     background: #fff5f5;
     border-left-color: #1976D2;
 }
-
-/* ── Expander styling ─────────────────────────────────────── */
 .streamlit-expanderHeader {
-    font-size: 0.85rem;
     color: #546e7a;
 }
+</style>
+"""
 
-/* ── Spinner overlay ──────────────────────────────────────── */
-.stSpinner > div {
-    border-color: #D32F2F !important;
+CUSTOM_CSS_DARK = """
+<style>
+""" + COMMON_CSS + """
+/* ── DARK MODE STYLES ─────────────────────────────────────── */
+/* Force absolute dark background */
+.stApp {
+    background: #0E1117;
+}
+
+/* Force text colors to soft white */
+.stMarkdown p, .stMarkdown li, .stMetric label, h1, h2, h3, h4, h5, h6 {
+    color: #FAFAFA !important;
+}
+
+.stButton > button {
+    border-radius: 8px;
+    border: 1px solid #37474F;
+    font-size: 0.85rem;
+    padding: 0.5rem 1rem;
+    transition: all 0.2s ease;
+    background: #262730;
+    color: #FAFAFA;
+}
+.stButton > button:hover {
+    border-color: #D32F2F;
+    color: #FAFAFA;
+    background: #3c2424;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(211,47,47,0.3);
+}
+
+.stButton > button p {
+    color: #FAFAFA !important;
+}
+
+.tool-badge {
+    display: inline-block;
+    background: #262730;
+    border-radius: 6px;
+    padding: 2px 10px;
+    font-size: 0.78rem;
+    color: #B0BEC5;
+    margin-top: 4px;
+    border: 1px solid #37474F;
+}
+
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #1A1C23 0%, #101216 100%);
+}
+section[data-testid="stSidebar"] .stMetric label {
+    font-size: 0.75rem;
+    color: #B0BEC5 !important;
+}
+
+.welcome-card {
+    background: linear-gradient(135deg, #1E1E1E 0%, #1A2520 50%, #2A2015 100%);
+    border-radius: 16px;
+    padding: 2.5rem 2rem;
+    margin: 1rem 0 2rem 0;
+    border: 1px solid #37474F;
+}
+.welcome-card h2 {
+    margin-top: 0;
+    color: #FAFAFA;
+}
+.welcome-card-desc {
+    color: #B0BEC5;
+    font-size: 1.05rem;
+}
+.welcome-card .example-q {
+    background: #262730;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    margin: 0.4rem 0;
+    border-left: 3px solid #D32F2F;
+    font-size: 0.9rem;
+    color: #B0BEC5;
+    cursor: default;
+    transition: all 0.15s ease;
+}
+/* ── Override Streamlit default app background ── */
+.stApp {
+    background: #0E1117;
+}
+[data-testid="stAppViewBlockContainer"] {
+    background-color: #0E1117;
+    padding-bottom: 2rem;
+}
+header[data-testid="stHeader"] {
+    background-color: transparent !important;
+}
+
+/* ── Chat input styling ── */
+[data-testid="stBottomBlockContainer"] {
+    background-color: #0E1117 !important;
+}
+.stChatInput {
+    background-color: #1A1C23 !important;
+    border-color: #37474F !important;
+}
+.stChatInput textarea {
+    color: #FAFAFA !important;
+    background-color: #1A1C23 !important;
+}
+
+/* ── Expander & DataFrame ── */
+.streamlit-expanderHeader {
+    color: #B0BEC5;
+    background-color: #1E1E1E;
+    border-radius: 8px;
+}
+div[data-testid="stExpander"] div[role="button"] p {
+    color: #B0BEC5 !important;
+}
+[data-testid="stDataFrame"] {
+    background-color: #1A1C23;
+}
+[data-testid="stDataFrame"] div, [data-testid="stDataFrame"] span {
+    color: #B0BEC5 !important;
+    background-color: transparent !important;
+}
+[data-testid="stDataFrame"] th {
+    background-color: #262730 !important;
+    color: #FAFAFA !important;
 }
 </style>
 """
 
 
-def inject_custom_css() -> None:
-    """Inject custom CSS into the Streamlit app."""
-    st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+def inject_custom_css(is_dark_mode: bool = False) -> None:
+    """Inject custom CSS into the Streamlit app based on the active theme."""
+    css = CUSTOM_CSS_DARK if is_dark_mode else CUSTOM_CSS_LIGHT
+    st.markdown(css, unsafe_allow_html=True)
 
 
 # =====================================================================
@@ -132,10 +269,20 @@ def render_sidebar(summary: dict, ollama_ok: bool, ollama_msg: str) -> None:
 
         # ── Security badge ──────────────────────────────────
         if ollama_ok:
-            st.success("🔒 AI Running Locally — Data Secure")
+            st.success("🔒 AI Running Locally - Data Secure")
         else:
             st.error("⚠️ Ollama Not Connected")
             st.markdown(ollama_msg)
+
+        st.divider()
+
+        # ── Theme Toggle ────────────────────────────────────
+        is_dark_mode = st.toggle("🌙 Dark Mode", value=st.session_state.get("dark_mode", False), key="dark_mode_toggle")
+        
+        # Immediate sync to session state to prevent lag
+        if "dark_mode" not in st.session_state or st.session_state.dark_mode != is_dark_mode:
+            st.session_state.dark_mode = is_dark_mode
+            st.rerun()
 
         st.divider()
 
@@ -206,11 +353,11 @@ def render_welcome() -> str | None:
     st.markdown(
         """
         <div class="welcome-card">
-            <h2>👋 Welcome to the Retail Analytics Agent!</h2>
-            <p style="color: #546e7a; font-size: 1.05rem;">
+            <h2>👋 Welcome to the Private Business Intelligence Agent!</h2>
+            <p class="welcome-card-desc">
                 Ask me anything about your Canadian Tire retail data.
                 I'll pick the right analysis tool, generate charts,
-                and give you business insights — all running <strong>100% locally</strong>.
+                and give you business insights - all running <strong>100% locally</strong>.
             </p>
         </div>
         """,
@@ -228,7 +375,7 @@ def render_welcome() -> str | None:
 #  CHAT MESSAGE RENDERING
 # =====================================================================
 
-def render_chat_message(msg: dict) -> None:
+def render_chat_message(msg: dict, msg_idx: int = 0) -> None:
     """
     Render a single chat message (user or assistant).
 
@@ -262,7 +409,7 @@ def render_chat_message(msg: dict) -> None:
             # Chart
             fig = msg.get("figure")
             if fig is not None:
-                st.plotly_chart(fig, width="stretch")
+                st.plotly_chart(fig, use_container_width=True, theme=None, key=f"chart_{msg_idx}")
 
             # Data table (collapsed)
             summary_df = msg.get("summary_df")

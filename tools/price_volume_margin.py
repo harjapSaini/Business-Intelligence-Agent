@@ -1,5 +1,5 @@
 """
-Tool 5 — Price-Volume-Margin Analysis
+Tool 5 - Price-Volume-Margin Analysis
 
 Scatter/bubble analysis: x = avg selling price, y = margin rate,
 bubble size = total units sold, colour = product category.
@@ -15,6 +15,7 @@ def price_volume_margin(
     df: pd.DataFrame,
     division: str = None,
     category: str = None,
+    _is_dark_mode: bool = False,
 ) -> tuple:
     """
     Bubble chart of price vs margin rate, sized by units sold.
@@ -25,7 +26,7 @@ def price_volume_margin(
         category: Optional category filter.
 
     Returns:
-        (plotly.Figure, pd.DataFrame) — bubble chart + product summary.
+        (plotly.Figure, pd.DataFrame) - bubble chart + product summary.
     """
     filtered = df.copy()
     if division:
@@ -51,7 +52,7 @@ def price_volume_margin(
     # Build chart
     title_suffix = ""
     if division:
-        title_suffix += f" — {division}"
+        title_suffix += f" - {division}"
     if category:
         title_suffix += f" / {category}"
 
@@ -72,7 +73,9 @@ def price_volume_margin(
         color_discrete_sequence=CHART_COLORS,
     )
     fig.update_layout(
-        template="plotly_white",
+        template="plotly_dark" if _is_dark_mode else "plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         font_family="Inter, sans-serif",
         title_font_size=18,
     )

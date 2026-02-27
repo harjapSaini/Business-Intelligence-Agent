@@ -1,5 +1,5 @@
 """
-Configuration constants for the Retail Analytics Agent.
+Configuration constants for the Private Business Intelligence Agent.
 All settings in one place for easy modification.
 """
 
@@ -11,7 +11,7 @@ OLLAMA_MODEL = "llama3.2:3b"
 DATA_PATH = "CaseStudy_DataExtractFromPowerBIFile.xlsx"
 
 # ── App settings ──────────────────────────────────────────────
-APP_TITLE = "🏪 Retail Analytics Agent"
+APP_TITLE = "🏪 Private Business Intelligence Agent"
 
 # ── Valid tool names for the LLM router ───────────────────────
 VALID_TOOLS = [

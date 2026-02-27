@@ -1,5 +1,5 @@
 """
-Tool 1 — Year-over-Year Comparison
+Tool 1 - Year-over-Year Comparison
 
 Compares a chosen metric across 2023 vs 2024, grouped by the most
 specific filter provided (or by division if none are given).
@@ -19,6 +19,7 @@ def yoy_comparison(
     region: str = None,
     category: str = None,
     brand: str = None,
+    _is_dark_mode: bool = False,
 ) -> tuple:
     """
     Compare a metric year-over-year (2023 vs 2024).
@@ -32,7 +33,7 @@ def yoy_comparison(
         brand:    Optional brand filter.
 
     Returns:
-        (plotly.Figure, pd.DataFrame) — grouped bar chart + summary table.
+        (plotly.Figure, pd.DataFrame) - grouped bar chart + summary table.
     """
     metric_col_map = {
         "sales": "SALES",
@@ -96,12 +97,14 @@ def yoy_comparison(
         y=col,
         color="YEAR",
         barmode="group",
-        title=f"YoY Comparison — {metric_label}",
+        title=f"YoY Comparison - {metric_label}",
         labels={col: metric_label, group_col: group_col.replace("_", " ").title()},
         color_discrete_map=YOY_COLORS,
     )
     fig.update_layout(
-        template="plotly_white",
+        template="plotly_dark" if _is_dark_mode else "plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         font_family="Inter, sans-serif",
         title_font_size=18,
         legend_title_text="Year",

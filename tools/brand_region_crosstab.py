@@ -1,5 +1,5 @@
 """
-Tool 2 — Brand × Region Cross-Tab
+Tool 2 - Brand × Region Cross-Tab
 
 Creates a heatmap of brands vs regions for a chosen metric.
 """
@@ -13,6 +13,7 @@ from config import HEATMAP_SCALE
 def brand_region_crosstab(
     df: pd.DataFrame,
     metric: str = "sales",
+    _is_dark_mode: bool = False,
 ) -> tuple:
     """
     Create a heatmap of brands vs regions for a chosen metric.
@@ -22,7 +23,7 @@ def brand_region_crosstab(
         metric: One of 'sales', 'margin', 'margin_rate', 'units'.
 
     Returns:
-        (plotly.Figure, pd.DataFrame) — heatmap + pivot table.
+        (plotly.Figure, pd.DataFrame) - heatmap + pivot table.
     """
     metric_col_map = {
         "sales": "SALES",
@@ -55,12 +56,14 @@ def brand_region_crosstab(
         x=pivot.columns.tolist(),
         y=pivot.index.tolist(),
         labels={"x": "Region", "y": "Brand", "color": metric_label},
-        title=f"Brand × Region — {metric_label}",
+        title=f"Brand × Region - {metric_label}",
         color_continuous_scale=HEATMAP_SCALE,
         aspect="auto",
     )
     fig.update_layout(
-        template="plotly_white",
+        template="plotly_dark" if _is_dark_mode else "plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         font_family="Inter, sans-serif",
         title_font_size=18,
     )

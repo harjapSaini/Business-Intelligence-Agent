@@ -1,5 +1,5 @@
 """
-Tool 3 — Forecast / Trendlines
+Tool 3 - Forecast / Trendlines
 
 Builds a monthly trendline with a 12-month linear forecast into 2025
 using sklearn LinearRegression.
@@ -18,6 +18,7 @@ def forecast_trendline(
     group_by: str = "division",
     group_value: str = None,
     metric: str = "sales",
+    _is_dark_mode: bool = False,
 ) -> tuple:
     """
     Build a monthly trendline with a 12-month linear forecast into 2025.
@@ -29,7 +30,7 @@ def forecast_trendline(
         metric:      One of 'sales', 'margin', 'units', 'margin_rate'.
 
     Returns:
-        (plotly.Figure, pd.DataFrame) — trend chart + monthly data table.
+        (plotly.Figure, pd.DataFrame) - trend chart + monthly data table.
     """
     group_col_map = {
         "division": "PRODUCT_DIVISION",
@@ -108,7 +109,7 @@ def forecast_trendline(
 
     # Build chart
     metric_label = metric.replace("_", " ").title()
-    title_suffix = f" — {group_value}" if group_value else ""
+    title_suffix = f" - {group_value}" if group_value else ""
     fig = go.Figure()
 
     # Historical line
@@ -135,10 +136,12 @@ def forecast_trendline(
     ))
 
     fig.update_layout(
-        title=f"Forecast — {metric_label}{title_suffix}",
+        title=f"Forecast - {metric_label}{title_suffix}",
         xaxis_title="Date",
         yaxis_title=metric_label,
-        template="plotly_white",
+        template="plotly_dark" if _is_dark_mode else "plotly_white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
         font_family="Inter, sans-serif",
         title_font_size=18,
     )
