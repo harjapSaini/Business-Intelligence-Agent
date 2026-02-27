@@ -9,8 +9,10 @@ All data stays on your machine. No internet connection required during use.
 
 | Tool   | Version | Purpose          |
 | ------ | ------- | ---------------- |
-| Python | 3.10+   | Runtime          |
+| Python | 3.11+   | Runtime          |
 | Ollama | latest  | Local LLM server |
+
+> **Note:** Python 3.9 will **not** work — Streamlit requires 3.10+ and this project uses 3.11 features.
 
 ---
 
@@ -23,14 +25,19 @@ git clone <repo-url>
 cd Business-Intelligence-Agent
 ```
 
-### 2. Create a virtual environment (recommended)
+### 2. Create a virtual environment
 
 ```bash
-python -m venv venv
-# Windows
+# Use py launcher to ensure Python 3.11 (not a system default like 3.9)
+py -3.11 -m venv venv
+
+# Activate — pick the command for your shell:
+# Git Bash (Windows)
+source venv/Scripts/activate
+# CMD
 venv\Scripts\activate
-# macOS / Linux
-source venv/bin/activate
+# PowerShell
+venv\Scripts\Activate.ps1
 ```
 
 ### 3. Install dependencies
@@ -41,12 +48,14 @@ pip install -r requirements.txt
 
 ### 4. Install & start Ollama
 
-Download from [ollama.com](https://ollama.com), then:
+Download and install from [ollama.com](https://ollama.com), then pull the model:
 
 ```bash
-ollama serve          # start the server (runs on localhost:11434)
 ollama pull llama3.2:3b   # download the model (~2 GB)
 ```
+
+> **Windows:** Ollama runs as a background service automatically after installation — no need to run `ollama serve`.  
+> **macOS / Linux:** You may need to run `ollama serve` in a separate terminal first.
 
 ### 5. Run the app
 

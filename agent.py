@@ -12,12 +12,130 @@ import streamlit as st
 
 from config import DATA_PATH
 from data_loader import load_data, get_dataset_summary
-from ollama_client import verify_ollama, warmup_model
-from ui import render_sidebar
+from ollama_client import verify_ollama, warmup_model, ask_llm
+from tools import tool_router
+from ui import render_sidebar, render_chat_message, render_suggestions
 
+
+# =====================================================================
+#  SESSION STATE INITIALISATION
+# =====================================================================
+
+def init_session_state() -> None:
+    """Initialise all session state keys on first run."""
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    if "session_memory" not in st.session_state:
+        st.session_state.session_memory = {
+            "entities": {},
+            "last_filters": {},
+            "last_result": {},
+        }
+
+    if "pending_question" not in st.session_state:
+        st.session_state.pending_question = None
+
+    if "ollama_ok" not in st.session_state:
+        st.session_state.ollama_ok = None
+        st.session_state.ollama_msg = ""
+
+    if "model_warmed" not in st.session_state:
+        st.session_state.model_warmed = False
+
+
+# =====================================================================
+#  MEMORY UPDATE
+# =====================================================================
+
+def update_memory(llm_response: dict, result_df=None) -> None:
+    """
+    Update session memory with entities and context from the latest
+    LLM response and tool result.
+
+    Merges new filter values into entities, stores last tool + filters,
+    and captures a description of the result for follow-up context.
+    """
+    mem = st.session_state.session_memory
+
+    # Update entities from filters (only non-None values)
+    filters = llm_response.get("filters", {})
+    entity_keys = ["region", "brand", "division", "category"]
+    for key in entity_keys:
+        val = filters.get(key)
+        if val and str(val).lower() not in ("null", "none", ""):
+            mem["entities"][key] = val
+
+    # Store last filters (include tool name)
+    mem["last_filters"] = {"tool": llm_response.get("tool", "")}
+    for k, v in filters.items():
+        if v and str(v).lower() not in ("null", "none", ""):
+            mem["last_filters"][k] = v
+
+    # Store last result description
+    mem["last_result"] = {
+        "description": llm_response.get("insight", "")[:200],
+    }
+
+    # Try to extract the top item from the result dataframe
+    if result_df is not None and len(result_df) > 0:
+        # Use first column that isn't a numeric type as label
+        for col_name in result_df.columns:
+            if result_df[col_name].dtype == "object":
+                mem["last_result"]["top_item"] = str(result_df[col_name].iloc[0])
+                break
+
+
+# =====================================================================
+#  PROCESS A QUESTION
+# =====================================================================
+
+def process_question(question: str, df, summary: dict) -> None:
+    """
+    Full pipeline: LLM call → tool routing → memory update → store message.
+
+    Args:
+        question: The user's natural-language question.
+        df:       Full DataFrame with KPI columns.
+        summary:  Dataset summary dict.
+    """
+    # Add user message
+    st.session_state.messages.append({"role": "user", "content": question})
+
+    # Call LLM
+    llm_response = ask_llm(
+        question,
+        st.session_state.session_memory,
+        summary,
+    )
+
+    # Route to the correct tool
+    tool_name = llm_response["tool"]
+    filters = llm_response["filters"]
+    fig, result_df, callouts = tool_router(tool_name, filters, df)
+
+    # Update session memory
+    update_memory(llm_response, result_df)
+
+    # Build assistant message
+    assistant_msg = {
+        "role": "assistant",
+        "tool": tool_name,
+        "insight": llm_response["insight"],
+        "suggestions": llm_response["suggestions"],
+        "figure": fig,
+        "summary_df": result_df,
+        "callouts": callouts,
+    }
+    st.session_state.messages.append(assistant_msg)
+
+
+# =====================================================================
+#  MAIN APP
+# =====================================================================
 
 def main():
-    """Entry point — configure page, load data, render app shell."""
+    """Entry point — configure page, load data, run chat interface."""
 
     # ── Page config (must be first Streamlit call) ──────────
     st.set_page_config(
@@ -26,36 +144,70 @@ def main():
         layout="wide",
     )
 
+    # ── Init session state ──────────────────────────────────
+    init_session_state()
+
     # ── Load data ───────────────────────────────────────────
     df = load_data(DATA_PATH)
     summary = get_dataset_summary(df)
 
-    # ── Verify Ollama ───────────────────────────────────────
-    ollama_ok, ollama_msg = verify_ollama()
+    # ── Verify Ollama (once per session) ────────────────────
+    if st.session_state.ollama_ok is None:
+        ok, msg = verify_ollama()
+        st.session_state.ollama_ok = ok
+        st.session_state.ollama_msg = msg
 
-    # ── Warm up the model (pre-load into memory) ───────────
-    if ollama_ok:
+    # ── Warm up the model (once per session) ────────────────
+    if st.session_state.ollama_ok and not st.session_state.model_warmed:
         warmup_model()
+        st.session_state.model_warmed = True
 
     # ── Sidebar ─────────────────────────────────────────────
-    render_sidebar(summary, ollama_ok, ollama_msg)
+    render_sidebar(
+        summary,
+        st.session_state.ollama_ok,
+        st.session_state.ollama_msg,
+    )
 
-    # ── Main area (Phase 1: data preview) ───────────────────
-    st.header("📋 Data Preview")
-    st.dataframe(df.head(20), width="stretch")
+    # ── Process pending question (from suggestion click) ────
+    if st.session_state.pending_question:
+        question = st.session_state.pending_question
+        st.session_state.pending_question = None
+        with st.spinner("🔍 Analysing..."):
+            process_question(question, df, summary)
 
-    # Show KPI column check
-    st.subheader("✅ KPI Columns")
-    kpi_cols = ["SALES", "COGS", "MARGIN", "MARGIN_RATE"]
-    cols = st.columns(len(kpi_cols))
-    for col, kpi in zip(cols, kpi_cols):
-        col.metric(kpi, f"{'✔' if kpi in df.columns else '✘'}")
+    # ── Render chat history ─────────────────────────────────
+    if not st.session_state.messages:
+        # Welcome message for empty chat
+        st.markdown(
+            """
+            ### 👋 Welcome to the Retail Analytics Agent!
 
-    # Quick sanity: total sales by year
-    st.subheader("💰 Total Sales by Year")
-    for year in sorted(df["YEAR"].unique()):
-        year_sales = df[df["YEAR"] == year]["SALES"].sum()
-        st.write(f"**{int(year)}:** ${year_sales:,.2f}")
+            Ask me anything about your Canadian Tire retail data.
+            Try questions like:
+            - *"Which division grew the most year over year?"*
+            - *"Show me the top brands by sales in the West region"*
+            - *"Project Apparel sales into 2025"*
+            """
+        )
+    else:
+        for msg in st.session_state.messages:
+            render_chat_message(msg)
+
+        # Show suggestions from last assistant message
+        last_msg = st.session_state.messages[-1]
+        if last_msg["role"] == "assistant":
+            suggestions = last_msg.get("suggestions", [])
+            clicked = render_suggestions(suggestions)
+            if clicked:
+                st.session_state.pending_question = clicked
+                st.rerun()
+
+    # ── Chat input ──────────────────────────────────────────
+    if prompt := st.chat_input("Ask a question about the data..."):
+        with st.spinner("🔍 Analysing..."):
+            process_question(prompt, df, summary)
+        st.rerun()
 
 
 if __name__ == "__main__":
