@@ -9,6 +9,8 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 
+from config import YOY_COLORS
+
 
 def yoy_comparison(
     df: pd.DataFrame,
@@ -96,7 +98,13 @@ def yoy_comparison(
         barmode="group",
         title=f"YoY Comparison — {metric_label}",
         labels={col: metric_label, group_col: group_col.replace("_", " ").title()},
+        color_discrete_map=YOY_COLORS,
     )
-    fig.update_layout(template="plotly_white")
+    fig.update_layout(
+        template="plotly_white",
+        font_family="Inter, sans-serif",
+        title_font_size=18,
+        legend_title_text="Year",
+    )
 
     return fig, summary_df

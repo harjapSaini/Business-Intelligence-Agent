@@ -14,7 +14,13 @@ from config import DATA_PATH
 from data_loader import load_data, get_dataset_summary
 from ollama_client import verify_ollama, warmup_model, ask_llm
 from tools import tool_router
-from ui import render_sidebar, render_chat_message, render_suggestions
+from ui import (
+    inject_custom_css,
+    render_sidebar,
+    render_chat_message,
+    render_suggestions,
+    render_welcome,
+)
 
 
 # =====================================================================
@@ -147,6 +153,9 @@ def main():
     # ── Init session state ──────────────────────────────────
     init_session_state()
 
+    # ── Inject custom CSS ───────────────────────────────────
+    inject_custom_css()
+
     # ── Load data ───────────────────────────────────────────
     df = load_data(DATA_PATH)
     summary = get_dataset_summary(df)
@@ -178,18 +187,11 @@ def main():
 
     # ── Render chat history ─────────────────────────────────
     if not st.session_state.messages:
-        # Welcome message for empty chat
-        st.markdown(
-            """
-            ### 👋 Welcome to the Retail Analytics Agent!
-
-            Ask me anything about your Canadian Tire retail data.
-            Try questions like:
-            - *"Which division grew the most year over year?"*
-            - *"Show me the top brands by sales in the West region"*
-            - *"Project Apparel sales into 2025"*
-            """
-        )
+        # Show polished welcome screen
+        clicked = render_welcome()
+        if clicked:
+            st.session_state.pending_question = clicked
+            st.rerun()
     else:
         for msg in st.session_state.messages:
             render_chat_message(msg)

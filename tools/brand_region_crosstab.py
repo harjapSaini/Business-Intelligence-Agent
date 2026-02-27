@@ -7,6 +7,8 @@ Creates a heatmap of brands vs regions for a chosen metric.
 import pandas as pd
 import plotly.express as px
 
+from config import HEATMAP_SCALE
+
 
 def brand_region_crosstab(
     df: pd.DataFrame,
@@ -54,9 +56,13 @@ def brand_region_crosstab(
         y=pivot.index.tolist(),
         labels={"x": "Region", "y": "Brand", "color": metric_label},
         title=f"Brand × Region — {metric_label}",
-        color_continuous_scale="RdYlGn",
+        color_continuous_scale=HEATMAP_SCALE,
         aspect="auto",
     )
-    fig.update_layout(template="plotly_white")
+    fig.update_layout(
+        template="plotly_white",
+        font_family="Inter, sans-serif",
+        title_font_size=18,
+    )
 
     return fig, summary_df

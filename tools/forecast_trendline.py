@@ -10,6 +10,8 @@ import pandas as pd
 import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression
 
+from config import FORECAST_HISTORICAL, FORECAST_PREDICTED, FORECAST_CONFIDENCE
+
 
 def forecast_trendline(
     df: pd.DataFrame,
@@ -113,21 +115,21 @@ def forecast_trendline(
     fig.add_trace(go.Scatter(
         x=monthly["DATE"], y=monthly[col],
         mode="lines+markers", name="Historical",
-        line=dict(color="#1976D2", width=2),
+        line=dict(color=FORECAST_HISTORICAL, width=2),
     ))
 
     # Forecast line (dotted)
     fig.add_trace(go.Scatter(
         x=forecast_df["DATE"], y=forecast_df[col],
         mode="lines+markers", name="Forecast",
-        line=dict(color="#D32F2F", width=2, dash="dot"),
+        line=dict(color=FORECAST_PREDICTED, width=2, dash="dot"),
     ))
 
     # Confidence shading
     fig.add_trace(go.Scatter(
         x=pd.concat([forecast_df["DATE"], forecast_df["DATE"][::-1]]),
         y=pd.concat([forecast_df["upper"], forecast_df["lower"][::-1]]),
-        fill="toself", fillcolor="rgba(211,47,47,0.15)",
+        fill="toself", fillcolor=FORECAST_CONFIDENCE,
         line=dict(color="rgba(255,255,255,0)"),
         showlegend=False, name="Confidence",
     ))
@@ -137,6 +139,8 @@ def forecast_trendline(
         xaxis_title="Date",
         yaxis_title=metric_label,
         template="plotly_white",
+        font_family="Inter, sans-serif",
+        title_font_size=18,
     )
 
     # Combine for summary table

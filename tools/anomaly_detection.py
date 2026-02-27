@@ -8,6 +8,8 @@ Flags outliers beyond ±2 standard deviations.
 import pandas as pd
 import plotly.express as px
 
+from config import ANOMALY_COLORS
+
 
 def anomaly_detection(
     df: pd.DataFrame,
@@ -78,12 +80,17 @@ def anomaly_detection(
         x="PRODUCT_NAME",
         y=col,
         color="label",
-        color_discrete_map={"Outlier": "#D32F2F", "Normal": "#1976D2"},
+        color_discrete_map=ANOMALY_COLORS,
         hover_data=["PRODUCT_CATEGORY", "PRODUCT_DIVISION", "z_score"],
         title=f"Anomaly Detection — {metric_label}",
         labels={col: metric_label},
     )
-    fig.update_layout(template="plotly_white", xaxis_tickangle=-45)
+    fig.update_layout(
+        template="plotly_white",
+        xaxis_tickangle=-45,
+        font_family="Inter, sans-serif",
+        title_font_size=18,
+    )
 
     # Outlier table
     outlier_df = product_agg[product_agg["is_outlier"]].sort_values(

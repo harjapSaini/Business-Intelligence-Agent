@@ -8,6 +8,8 @@ bubble size = total units sold, colour = product category.
 import pandas as pd
 import plotly.express as px
 
+from config import CHART_COLORS
+
 
 def price_volume_margin(
     df: pd.DataFrame,
@@ -67,7 +69,12 @@ def price_volume_margin(
             "margin_rate": "Margin Rate",
             "total_units": "Units Sold",
         },
+        color_discrete_sequence=CHART_COLORS,
     )
-    fig.update_layout(template="plotly_white")
+    fig.update_layout(
+        template="plotly_white",
+        font_family="Inter, sans-serif",
+        title_font_size=18,
+    )
 
     return fig, product_agg
