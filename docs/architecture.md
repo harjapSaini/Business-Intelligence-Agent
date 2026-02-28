@@ -26,12 +26,12 @@
 
 | Module               | Responsibility                                               |
 | -------------------- | ------------------------------------------------------------ |
-| `agent.py`           | Page config, session state, chat loop, 2-pass orchestration  |
-| `config.py`          | Constants: URLs, model, paths, tool names, colour palette    |
+| `agent.py`           | Page config, session state, processing gate, chat loop, 2-pass orchestration |
+| `config.py`          | Constants: URLs, model, paths, tool names, colour palettes   |
 | `data_loader.py`     | Load Excel/CSV, compute KPIs, build dataset summary          |
-| `ollama_client.py`   | Pass 1 (Router Prompt), Pass 2 (Insight Prompt), API calls   |
+| `ollama_client.py`   | Pass 1 (Router Prompt), Pass 2 (Insight Prompt), API calls, `validate_routing()`, `extract_missing_filters()` |
 | `insight_builder.py` | Summarizes raw DataFrame outputs into dense text for the LLM |
-| `ui.py`              | CSS injection, dark mode toggle, sidebars, components        |
+| `ui.py`              | CSS injection, dark/light mode toggle, sidebars, loading animation, chat rendering, suggestion buttons |
 | `tools/`             | 13 analysis functions + tool router dispatcher               |
 
 ## Data Flow (Two-Pass LLM Architecture)
@@ -90,6 +90,9 @@ User Question
 | **JSON over function calling** | The 3B model doesn't support native function calling; structured JSON prompting is more reliable |
 | **Multi-layer fallback**       | LLM may fail → JSON parsing may fail → validation catches everything → always a valid response   |
 | **Local-first**                | Ollama runs locally; no data leaves the device; satisfies enterprise security requirements       |
+| **3-layer routing safety**     | System prompt + `validate_routing()` keyword guard + `extract_missing_filters()` gap filler ensures the right tool runs with correct filters |
+| **Processing state gate**      | `st.session_state.processing` disables all interactive elements (input, toggles, buttons) during pipeline execution to prevent double-submissions and UI resets |
+| **st.html() for insights**     | Bypasses Streamlit's markdown parser which misinterprets number/comma patterns as code spans     |
 
 ## Adding a New Tool
 

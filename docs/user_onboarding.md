@@ -53,14 +53,25 @@ When the agent responds, it provides:
 - A collapsable **View Data Table** to see the raw numbers backing the chart.
 - 3 dynamic **Follow-Up Questions** you can click instantly to dive deeper.
 
-#### 3. Session Memory
+#### 3. While Loading
+
+While the agent is processing your question:
+
+- Your question is immediately displayed in the chat so you know what was submitted.
+- A **cycling loading animation** shows rotating status messages ("Crunching the numbers...", "Spotting trends...", etc.) to keep you informed.
+- The **chat input** is disabled — you cannot submit another question until the current response completes.
+- **Follow-up suggestion buttons** and **welcome screen buttons** are disabled to prevent double-submissions.
+- The **Dark Mode toggle** is temporarily locked to prevent UI resets.
+
+#### 4. Session Memory
 
 The agent **remembers your context**.
 If you ask, _"How did Sports perform?"_ and then say _"What about in the West?"_, the agent remembers you are still talking about the Sports division and filters accordingly.
 
 **To reset memory:** Click the "🗑️ Clear Conversation" button in the sidebar.
 
-#### 4. UI Controls
+#### 5. UI Controls
 
-- Use the **🌙 Dark Mode** switch in the sidebar to toggle themes.
-- View the **📊 Dataset Overview** in the sidebar to understand the total scale and current KPIs of the loaded CSV.
+- Use the **🌙 Dark Mode** switch in the sidebar to toggle themes (disabled during loading).
+- View the **📊 Dataset Overview** in the sidebar to understand the total scale and current KPIs of the loaded dataset.
+- The welcome screen displays **10 example questions in a two-column layout** to help you get started quickly.

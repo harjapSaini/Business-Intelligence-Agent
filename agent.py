@@ -21,6 +21,7 @@ from ui import (
     render_chat_message,
     render_suggestions,
     render_welcome,
+    render_loading_animation,
 )
 
 
@@ -52,6 +53,9 @@ def init_session_state() -> None:
 
     if "dark_mode" not in st.session_state:
         st.session_state.dark_mode = False
+
+    if "processing" not in st.session_state:
+        st.session_state.processing = False
 
 
 # =====================================================================
@@ -99,7 +103,7 @@ def update_memory(tool_name: str, filters: dict, insight: str, result_df=None) -
 #  PROCESS A QUESTION (TWO-PASS LLM PIPELINE)
 # =====================================================================
 
-def process_question(question: str, df, summary: dict, is_dark_mode: bool = False) -> None:
+def process_question(question: str, df, summary: dict, is_dark_mode: bool = False, add_user_msg: bool = True) -> None:
     """
     Full pipeline:
       Pass 1: LLM picks tool + filters
@@ -111,9 +115,11 @@ def process_question(question: str, df, summary: dict, is_dark_mode: bool = Fals
         df:       Full DataFrame with KPI columns.
         summary:  Dataset summary dict.
         is_dark_mode: Current theme setting for chart templates.
+        add_user_msg: Whether to append the user message to history.
     """
     # Add user message
-    st.session_state.messages.append({"role": "user", "content": question})
+    if add_user_msg:
+        st.session_state.messages.append({"role": "user", "content": question})
 
     # ── Pass 1: Pick the right tool + filters ───────────────
     llm_routing = ask_llm(
@@ -190,7 +196,9 @@ def main():
 
     # ── Init session state ──────────────────────────────────
     init_session_state()
-
+    # Reset stale processing flag (e.g. if previous run was interrupted)
+    if st.session_state.processing and not st.session_state.pending_question:
+        st.session_state.processing = False
     # ── Inject custom CSS ───────────────────────────────────
     is_dark = st.session_state.get("dark_mode", False)
     inject_custom_css(is_dark)
@@ -217,19 +225,53 @@ def main():
         st.session_state.ollama_msg,
     )
 
-    # ── Process pending question (from suggestion click) ────
+    # ── Chat input (always visible, disabled while processing) ──
+    prompt = st.chat_input(
+        "Ask a question about the data...",
+        disabled=st.session_state.processing,
+    )
+    if prompt:
+        st.session_state.pending_question = prompt
+        st.session_state.processing = True
+        st.rerun()
+
+    # ── Process pending question ────────────────────────────
     if st.session_state.pending_question:
         question = st.session_state.pending_question
-        st.session_state.pending_question = None
-        with st.spinner("🔍 Analysing..."):
-            process_question(question, df, summary, is_dark)
 
-    # ── Render chat history ─────────────────────────────────
+        # Add user message to history (guard against duplicates)
+        if (not st.session_state.messages
+                or st.session_state.messages[-1].get("role") != "user"
+                or st.session_state.messages[-1].get("content") != question):
+            st.session_state.messages.append(
+                {"role": "user", "content": question}
+            )
+
+        # Render chat history so the user sees their prompt
+        for idx, msg in enumerate(st.session_state.messages):
+            render_chat_message(msg, msg_idx=idx, is_dark=is_dark)
+
+        # Show cycling loading animation
+        loading = st.empty()
+        with loading.container():
+            render_loading_animation(is_dark)
+
+        # Run the two-pass pipeline
+        try:
+            process_question(question, df, summary, is_dark, add_user_msg=False)
+        finally:
+            st.session_state.processing = False
+            st.session_state.pending_question = None
+        loading.empty()
+        st.rerun()
+
+    # ── Render chat history (normal, non-processing path) ───
     if not st.session_state.messages:
         # Show polished welcome screen
         clicked = render_welcome()
         if clicked:
             st.session_state.pending_question = clicked
+            st.session_state.processing = True
             st.rerun()
     else:
         for idx, msg in enumerate(st.session_state.messages):
@@ -242,13 +284,8 @@ def main():
             clicked = render_suggestions(suggestions)
             if clicked:
                 st.session_state.pending_question = clicked
+                st.session_state.processing = True
                 st.rerun()
-
-    # ── Chat input ──────────────────────────────────────────
-    if prompt := st.chat_input("Ask a question about the data..."):
-        with st.spinner("🔍 Analysing..."):
-            process_question(prompt, df, summary, is_dark)
-        st.rerun()
 
 
 if __name__ == "__main__":

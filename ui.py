@@ -3,7 +3,10 @@ UI components for the Private Business Intelligence Agent.
 Sidebar, chat messages, suggestion buttons, and custom styling.
 """
 
+import json
+
 import streamlit as st
+import streamlit.components.v1 as components
 from config import APP_TITLE
 
 
@@ -359,12 +362,18 @@ def render_sidebar(summary: dict, ollama_ok: bool, ollama_msg: str) -> None:
         st.divider()
 
         # ── Theme Toggle ────────────────────────────────────
-        is_dark_mode = st.toggle("🌙 Dark Mode", value=st.session_state.get("dark_mode", False), key="dark_mode_toggle")
+        is_dark_mode = st.toggle(
+            "🌙 Dark Mode",
+            value=st.session_state.get("dark_mode", False),
+            key="dark_mode_toggle",
+            disabled=st.session_state.get("processing", False),
+        )
         
         # Immediate sync to session state to prevent lag
         if "dark_mode" not in st.session_state or st.session_state.dark_mode != is_dark_mode:
             st.session_state.dark_mode = is_dark_mode
-            st.rerun()
+            if not st.session_state.get("processing", False):
+                st.rerun()
 
         st.divider()
 
@@ -431,6 +440,60 @@ EXAMPLE_QUESTIONS = [
     "Project Apparel division sales into 2025",
 ]
 
+LOADING_MESSAGES = [
+    "\U0001f50d Analysing your data...",
+    "\U0001f4ca Crunching the numbers...",
+    "\U0001f9ee Running calculations...",
+    "\U0001f4a1 Generating insights...",
+    "\U0001f4c8 Spotting trends...",
+    "\U0001f50e Digging into the details...",
+    "\u26a1 Processing your request...",
+    "\U0001f3af Finding patterns...",
+    "\U0001f4cb Preparing your report...",
+    "\U0001f9e0 Thinking hard...",
+    "\U0001f522 Counting every row...",
+    "\U0001f4c9 Checking for anomalies...",
+    "\U0001f5c2\ufe0f Sorting through records...",
+    "\U0001f52c Examining the data closely...",
+    "\U0001f4d0 Measuring performance...",
+    "\U0001f3d7\ufe0f Building your chart...",
+    "\U0001f3a8 Designing the visualization...",
+    "\U0001f5c3\ufe0f Querying the dataset...",
+    "\u23f3 Almost there...",
+    "\U0001f504 Cross-referencing metrics...",
+    "\U0001f4ca Comparing year over year...",
+    "\U0001f9e9 Piecing it all together...",
+    "\U0001f4bc Consulting the AI brain...",
+    "\U0001f52e Predicting the outcome...",
+    "\U0001f4dd Drafting the insight...",
+    "\U0001f3b2 Running statistical checks...",
+    "\U0001f30d Scanning all regions...",
+    "\U0001f3f7\ufe0f Categorizing the results...",
+    "\U0001f4e6 Unpacking the numbers...",
+    "\U0001f527 Fine-tuning the analysis...",
+    "\U0001f3af Zeroing in on answers...",
+    "\U0001f4ca Aggregating totals...",
+    "\U0001f9ea Testing hypotheses...",
+    "\U0001f4c8 Evaluating growth rates...",
+    "\U0001f50d Investigating further...",
+    "\U0001f4b0 Tallying the figures...",
+    "\U0001f4cb Compiling the summary...",
+    "\U0001f504 Refreshing the view...",
+    "\U0001f4d0 Calibrating the metrics...",
+    "\U0001f9e0 Applying AI magic...",
+    "\U0001f6e0\ufe0f Assembling your answer...",
+    "\U0001f5c4\ufe0f Mining the database...",
+    "\U0001f517 Connecting the dots...",
+    "\U0001f4ca Benchmarking divisions...",
+    "\U0001f3af Honing in on key data...",
+    "\u2699\ufe0f Running the engine...",
+    "\U0001f4dd Writing up findings...",
+    "\U0001f52c Performing deep analysis...",
+    "\U0001f4a1 Extracting key takeaways...",
+    "\U0001f3c1 Finalizing the results...",
+    "\U0001f31f Polishing the insights...",
+]
+
 
 def render_welcome() -> str | None:
     """
@@ -451,11 +514,82 @@ def render_welcome() -> str | None:
         unsafe_allow_html=True,
     )
 
+    is_busy = st.session_state.get("processing", False)
     st.markdown("**Try one of these questions to get started:**")
+    col1, col2 = st.columns(2)
     for i, q in enumerate(EXAMPLE_QUESTIONS):
-        if st.button(f"💬  {q}", key=f"welcome_{i}", use_container_width=True):
+        col = col1 if i % 2 == 0 else col2
+        if col.button(f"💬  {q}", key=f"welcome_{i}", use_container_width=True, disabled=is_busy):
             return q
     return None
+
+
+# =====================================================================
+#  LOADING ANIMATION
+# =====================================================================
+
+def render_loading_animation(is_dark: bool = False) -> None:
+    """Render a cycling loading animation with rotating status messages."""
+    text_color = "#e0e0e0" if is_dark else "#263238"
+    bg_color = "#1A1C23" if is_dark else "#f8f9fa"
+    border_color = "#37474F" if is_dark else "#e0e0e0"
+    spinner_track = "#37474F" if is_dark else "#e0e0e0"
+    messages_js = json.dumps(LOADING_MESSAGES)
+
+    html = f"""
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap');
+        @keyframes spin {{
+            to {{ transform: rotate(360deg); }}
+        }}
+        body {{ margin: 0; padding: 0; background: transparent; }}
+        .loader-box {{
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 20px;
+            background: {bg_color};
+            border: 1px solid {border_color};
+            border-radius: 12px;
+            font-family: 'Inter', sans-serif;
+        }}
+        .loader-spin {{
+            width: 20px; height: 20px;
+            border: 3px solid {spinner_track};
+            border-top: 3px solid #D32F2F;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            flex-shrink: 0;
+        }}
+        .loader-text {{
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: {text_color};
+            transition: opacity 0.3s ease;
+        }}
+    </style>
+    <div class="loader-box">
+        <div class="loader-spin"></div>
+        <span class="loader-text" id="loader-txt">{LOADING_MESSAGES[0]}</span>
+    </div>
+    <script>
+        const msgs = {messages_js};
+        let i = Math.floor(Math.random() * msgs.length);
+        const el = document.getElementById('loader-txt');
+        if (el) el.textContent = msgs[i];
+        setInterval(() => {{
+            i = (i + 1) % msgs.length;
+            if (el) {{
+                el.style.opacity = '0';
+                setTimeout(() => {{
+                    el.textContent = msgs[i];
+                    el.style.opacity = '1';
+                }}, 250);
+            }}
+        }}, 2500);
+    </script>
+    """
+    components.html(html, height=70)
 
 
 # =====================================================================
@@ -528,9 +662,10 @@ def render_suggestions(suggestions: list[str]) -> str | None:
     if not suggestions:
         return None
 
+    is_busy = st.session_state.get("processing", False)
     st.markdown("**💡 Follow-up questions:**")
     cols = st.columns(len(suggestions))
     for i, (col, text) in enumerate(zip(cols, suggestions)):
-        if col.button(text, key=f"suggest_{i}", use_container_width=True):
+        if col.button(text, key=f"suggest_{i}", use_container_width=True, disabled=is_busy):
             return text
     return None

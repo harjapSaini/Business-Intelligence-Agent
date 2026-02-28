@@ -50,11 +50,12 @@ pip install -r requirements.txt
 
 **Cause:** The 3B model sometimes misinterprets ambiguous questions.
 
-**Fix:** Rephrase your question to be more specific:
+**Fix:** The app has a 3-layer routing safety net (system prompt → `validate_routing()` keyword guard → `extract_missing_filters()` gap filler), but you can also help by rephrasing:
 
 - ❌ "Tell me about sales" (too vague)
 - ✅ "Compare 2023 vs 2024 sales by division" (clear → YoY comparison)
 - ✅ "What's the forecast for Apparel sales?" (clear → forecast)
+- ✅ "Which brand grew the most year over year?" (clear → YoY by brand)
 
 ---
 
@@ -88,6 +89,22 @@ streamlit run agent.py --server.port 8502
 netstat -ano | findstr :8501
 taskkill /PID <PID> /F
 ```
+
+---
+
+### Chat input / buttons seem stuck or disabled
+
+**Cause:** The `processing` state flag may be stale if a previous response was interrupted (e.g., by a page refresh during loading).
+
+**Fix:** The app auto-resets this flag on the next page load. If it persists, click "🗑️ Clear Conversation" in the sidebar or refresh the browser page.
+
+---
+
+### Dark mode toggle doesn't work while loading
+
+**Cause:** This is intentional. The toggle is disabled during response processing to prevent the UI from resetting and cancelling the in-progress analysis.
+
+**Fix:** Wait for the current response to finish, then toggle the theme.
 
 ---
 

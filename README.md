@@ -69,23 +69,26 @@ The app opens at **http://localhost:8501**.
 
 ## Example Questions
 
-1. "Which division grew the most year over year?"
-2. "Show me margin rate by region for 2024"
-3. "Which brands perform best in the West region?"
-4. "Are there any anomalies in product pricing or margins?"
-5. "Project Apparel division sales into 2025"
-6. "What is the relationship between price and margin rate in the Tools division?"
-7. "Which division has the worst margin rate and has it gotten worse?"
-8. "Show me the top 5 brands by sales"
-9. "Now break that down by region"
-10. "What does the forecast look like for the top brand?"
+1. "How is the business performing overall?"
+2. "Which division grew the most year over year?"
+3. "Which stores are underperforming?"
+4. "Is there a seasonal pattern in Gardening?"
+5. "What percentage of sales does each division represent?"
+6. "Why did our margins change?"
+7. "Where are our stars and dogs?"
+8. "Which categories are most price sensitive?"
+9. "Which brand owns the Fitness category?"
+10. "Project Apparel division sales into 2025"
+11. "Which brand grew the most year over year?"
+12. "Show me the top 5 brands by sales in the West region"
 
 ---
 
 ## Tech Stack
 
-- **UI**: Streamlit
+- **UI**: Streamlit (with custom light/dark CSS themes, processing state gate, cycling loading animation)
 - **LLM**: Ollama (llama3.2:3b) - runs 100% locally
-- **Charts**: Plotly
+- **Charts**: Plotly (theme-aware, dynamically re-templated)
+- **Routing**: 3-layer safety net (system prompt + keyword guard + filter gap filler)
 - **Forecasting**: scikit-learn (LinearRegression)
 - **Data**: Pandas + openpyxl

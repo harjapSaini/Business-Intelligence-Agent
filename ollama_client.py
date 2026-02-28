@@ -415,10 +415,18 @@ _BRAND_NAMES = [
 ]
 
 # Canonical filter values for extraction fallback
-_REGIONS = ["East", "West", "Central", "Atlantic"]
+_REGIONS = ["East", "West", "North", "South"]
 _DIVISIONS = ["Apparel", "Tools", "Sports", "Gardening", "Food"]
+_CATEGORIES = [
+    "Shirts", "Shoes", "Power Tools", "Team Sports", "Decor",
+    "Beverages", "Plants", "Pantry", "Snacks", "Safety Gear",
+    "Garden Tools", "Fitness",
+]
 _BRANDS_TITLE = ["Novex", "Vetra", "Trion", "Zentra", "Dexon",
                  "Fynix", "Kryta", "Lumix", "Quanta", "Solvo"]
+_METRICS = ["sales", "margin", "margin_rate", "units"]
+_GROUP_BY_VALUES = ["division", "brand", "region", "category"]
+_TIME_GRAINS = ["month", "quarter"]
 
 
 def validate_routing(question: str, llm_tool: str) -> str:
@@ -535,33 +543,44 @@ def validate_routing(question: str, llm_tool: str) -> str:
 def extract_missing_filters(question: str, existing_filters: dict) -> dict:
     """
     Scan the question for filter values the LLM missed.
-    Fills gaps without overwriting correct values.
+    Fills gaps without overwriting correct LLM-extracted values.
+
+    Covers ALL filters used across all 13 tools:
+      region, division, category, brand, metric, group_by,
+      group_value, time_grain, top_n, view, year
     """
     q = question.lower()
     filters = existing_filters.copy()
 
-    # Region extraction fallback
+    # ── region ──────────────────────────────────────────────────────────
     if not filters.get("region") or str(filters["region"]).lower() in ("null", "none"):
         for region in _REGIONS:
             if region.lower() in q:
                 filters["region"] = region
                 break
 
-    # Division extraction fallback
+    # ── division ─────────────────────────────────────────────────────────
     if not filters.get("division") or str(filters["division"]).lower() in ("null", "none"):
         for division in _DIVISIONS:
             if division.lower() in q:
                 filters["division"] = division
                 break
 
-    # Brand extraction fallback
+    # ── category ─────────────────────────────────────────────────────────
+    if not filters.get("category") or str(filters["category"]).lower() in ("null", "none"):
+        for cat in _CATEGORIES:
+            if cat.lower() in q:
+                filters["category"] = cat
+                break
+
+    # ── brand ─────────────────────────────────────────────────────────────
     if not filters.get("brand") or str(filters["brand"]).lower() in ("null", "none"):
         for brand in _BRANDS_TITLE:
             if brand.lower() in q:
                 filters["brand"] = brand
                 break
 
-    # Metric default fallback
+    # ── metric ───────────────────────────────────────────────────────────
     if not filters.get("metric") or str(filters["metric"]).lower() in ("null", "none"):
         if any(w in q for w in ["margin rate", "margin_rate"]):
             filters["metric"] = "margin_rate"
@@ -570,31 +589,81 @@ def extract_missing_filters(question: str, existing_filters: dict) -> dict:
         elif "unit" in q:
             filters["metric"] = "units"
         else:
-            filters["metric"] = "sales"
+            filters["metric"] = "sales"  # always default to sales
 
-    # top_n extraction fallback
-    if not filters.get("top_n") or str(filters["top_n"]).lower() in ("null", "none"):
-        match = re.search(r"top\s+(\d+)", q)
-        if match:
-            filters["top_n"] = int(match.group(1))
-
-    # view extraction fallback (top/bottom)
-    if not filters.get("view") or str(filters["view"]).lower() in ("null", "none"):
-        if "bottom" in q or "worst" in q or "underperform" in q:
-            filters["view"] = "bottom"
-        elif "top" in q and "store" in q:
-            filters["view"] = "top"
-
-    # group_by extraction fallback (for yoy_comparison)
+    # ── group_by ─────────────────────────────────────────────────────────
+    # Used by: yoy_comparison, margin_waterfall, growth_margin_matrix, forecast_trendline
     if not filters.get("group_by") or str(filters["group_by"]).lower() in ("null", "none"):
         if any(w in q for w in ["brand", "brands"]):
             filters["group_by"] = "brand"
         elif any(w in q for w in ["category", "categories"]):
             filters["group_by"] = "category"
         elif any(w in q for w in ["region", "regions"]) and not filters.get("region"):
-            # "Which region grew?" → group by region
-            # "How did East perform?" → filter by region, group by division
+            # "Which region grew most?" → group by region
+            # "How did East perform?" → filter by region (already set above), default group
             filters["group_by"] = "region"
+        elif filters.get("division"):
+            # If a division is already filtered, group within it by category
+            filters["group_by"] = "category"
+        else:
+            filters["group_by"] = "division"  # safe default
+
+    # ── group_value ──────────────────────────────────────────────────────
+    # Used by forecast_trendline: e.g. "Project West region" → group_by=region, group_value=West
+    if not filters.get("group_value") or str(filters["group_value"]).lower() in ("null", "none"):
+        gb = filters.get("group_by", "")
+        if gb == "region" and filters.get("region"):
+            filters["group_value"] = filters["region"]
+        elif gb == "division" and filters.get("division"):
+            filters["group_value"] = filters["division"]
+        elif gb == "brand" and filters.get("brand"):
+            filters["group_value"] = filters["brand"]
+        elif gb == "category" and filters.get("category"):
+            filters["group_value"] = filters["category"]
+
+    # ── time_grain ───────────────────────────────────────────────────────
+    # Used by: seasonality_trends, forecast_trendline
+    if not filters.get("time_grain") or str(filters["time_grain"]).lower() in ("null", "none"):
+        if any(w in q for w in ["quarter", "quarterly", "q1", "q2", "q3", "q4"]):
+            filters["time_grain"] = "quarter"
+        elif any(w in q for w in ["month", "monthly", "january", "february", "march",
+                                   "april", "may", "june", "july", "august",
+                                   "september", "october", "november", "december"]):
+            filters["time_grain"] = "month"
+        # No default — tools handle null gracefully (default to month internally)
+
+    # ── top_n ────────────────────────────────────────────────────────────
+    # Used by: brand_region_crosstab, store_performance, yoy_comparison, brand_benchmarking
+    if not filters.get("top_n") or str(filters["top_n"]).lower() in ("null", "none"):
+        import re as _re
+        match = _re.search(r"top\s+(\d+)", q)
+        if match:
+            filters["top_n"] = int(match.group(1))
+        elif "bottom" in q:
+            # "bottom 5" pattern
+            match = _re.search(r"bottom\s+(\d+)", q)
+            if match:
+                filters["top_n"] = int(match.group(1))
+        # No default — tools use their own defaults (usually 5 or 10)
+
+    # ── view ─────────────────────────────────────────────────────────────
+    # Used by: store_performance, yoy_comparison, brand_region_crosstab
+    if not filters.get("view") or str(filters["view"]).lower() in ("null", "none"):
+        if any(w in q for w in ["bottom", "worst", "underperform", "lowest",
+                                  "weakest", "lagging"]):
+            filters["view"] = "bottom"
+        elif any(w in q for w in ["top", "best", "highest", "leading", "strongest"]):
+            filters["view"] = "top"
+        # No default — tools handle null (usually show both or top)
+
+    # ── year ─────────────────────────────────────────────────────────────
+    # Used by: yoy_comparison, brand_region_crosstab, store_performance
+    if not filters.get("year") or str(filters["year"]).lower() in ("null", "none"):
+        if "2023" in q:
+            filters["year"] = 2023
+        elif "2024" in q:
+            filters["year"] = 2024
+        # No default — null means use both years (correct for most YoY tools)
 
     return filters
 

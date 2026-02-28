@@ -13,6 +13,8 @@ All 7 phases have been verified for mathematical accuracy, UI robustness, and LL
 | Phase 5 - UI Polish       | 30/30                | ✅     |
 | Phase 6 - Dark / Light UI | Browser Subagent     | ✅     |
 | Phase 7 - Two-Pass LLM    | Browser Subagent     | ✅     |
+| Routing Hardening         | Manual + Unit        | ✅     |
+| UX Polish                 | Manual               | ✅     |
 
 ## Phase 1 Tests
 
@@ -66,27 +68,37 @@ All 7 phases have been verified for mathematical accuracy, UI robustness, and LL
 
 ## Phase 5 Tests
 
-- Config has CHART*COLORS (10), YOY_COLORS, ANOMALY_COLORS, FORECAST*\*, HEATMAP_SCALE
+- Config has CHART_COLORS (10), YOY_COLORS, ANOMALY_COLORS, FORECAST_\*, HEATMAP_SCALE
 - All 13 charts use correct config colours (including WATERFALL_COLORS, RAG_COLORS, QUADRANT_COLORS)
 - All 13 charts use Inter font and title_font_size=18
-- UI module exports: inject_custom_css, render_welcome, render_chat_message, render_suggestions
-- Welcome screen has 5 example questions
+- UI module exports: inject_custom_css, render_welcome, render_chat_message, render_suggestions, render_loading_animation
+- Welcome screen has 10 example questions in a 2-column layout
 - Custom CSS has: Inter font import, button hover, tool-badge class, sidebar gradient, Canadian Tire red
+- Processing state disables chat input, welcome buttons, suggestion buttons, and dark mode toggle
+- Cycling loading animation shows 51 rotating messages with CSS fade transition
+- User prompt visible in chat history while response loads
+- st.html() renders insight text (bypasses Streamlit markdown parser bugs)
 
 ## Phase 6 Tests
 
 - Custom CSS blocks explicitly define Light and Dark mode variables.
 - Streamlit Base theme logic overridden in `.streamlit/config.toml` to prevent OS-level bleeding.
 - Dark mode toggle in sidebar switches `st.session_state.dark_mode`.
+- Dark mode toggle is disabled during processing to prevent UI resets.
 - Plotly templates dynamically swap between `plotly_white` and `plotly_dark`.
+- Historical charts re-template at render time to match current theme.
 - Text contrast passes legibility tests in both modes.
 
 ## Phase 7 Tests
 
 - All 13 tool outputs successfully serialized into compact string summaries via `insight_builder.py`.
 - LLM Router reliably fires immediately on prompt submission (Pass 1).
-- Execution sequence verified: LLM Router -> Tool Processing -> Data Summarization -> LLM Insight (Pass 2).
+- Execution sequence verified: LLM Router -> Routing Safety Net -> Tool Processing -> Data Summarization -> LLM Insight (Pass 2).
 - LLM narrations explicitly quote numbers, brands, and percentages from the tool output, eliminating generic hallucinations.
+- `validate_routing()` correctly routes brand+YoY overlap questions (e.g., "Which brand grew the most year over year?" → `yoy_comparison`, not `brand_region_crosstab`).
+- `extract_missing_filters()` correctly infers `group_by` from keywords: "brand" → brand, "region" (without filter) → region, default → division.
+- `clean_insight_text()` strips all markdown formatting; `validate_insight_format()` catches structured data leaks.
+- Insight text renders cleanly via `st.html()` with no backtick or code-span artifacts.
 
 ## Running Tests
 
