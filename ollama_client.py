@@ -119,104 +119,229 @@ def build_system_prompt(df_summary: dict, session_memory: dict = None) -> str:
         if parts:
             memory_block = "\n".join(parts)
 
-    prompt = f"""You are a Private Business Intelligence Agent for Canadian Tire.
-You analyze a dataset with {df_summary['total_rows']:,} rows of retail transaction data.
+    prompt = f"""You are a Private Business Intelligence Agent.
+You analyze a retail dataset with {df_summary['total_rows']:,} rows.
 
-Dataset columns: YEAR, QUARTER, MONTH, DATE, STORE_ID, STORE_NAME, STORE_SIZE, REGION, PRODUCT_ID, BRAND, PRODUCT_CATEGORY, PRODUCT_DIVISION, PRODUCT_NAME, SELLING_PRICE_PER_UNIT, UNITS_SOLD, COST_PER_UNIT
-Derived KPI columns: SALES, COGS, MARGIN, MARGIN_RATE
+=== SECTION 1: TOOL DEFINITIONS ===
 
-Available filter values:
-- divisions: {df_summary['divisions']}
-- regions: {df_summary['regions']}
-- categories: {df_summary['categories']}
-- brands: {df_summary['brands']}
-- metrics: ["sales", "margin", "units", "margin_rate"]
-- years: {df_summary['years']}
+You have exactly 13 tools. You MUST pick the ONE best tool for each question.
 
-You have exactly 13 analysis tools. Pick the ONE best tool for each question:
+TOOL 1: "yoy_comparison"
+  Description: Year-over-year comparisons, growth analysis, performance by division/region/brand.
+  Filters: metric (sales/margin/units/margin_rate), group_by (division/brand/region/category, default: division)
+  Example questions:
+    - "Which division grew the most year over year?"
+    - "Which brand grew the most year over year?"  (group_by: brand)
+    - "How did Apparel perform compared to last year?"
+    - "What is the sales growth rate by region?"  (group_by: region)
+    - "Show me 2023 vs 2024 performance"
+    - "Which region had the worst decline?"
+  Strong keywords: "grew", "growth", "year over year", "yoy", "vs last year", "2023 vs 2024", "change over time", "how did X perform"
 
-1. "yoy_comparison" - Use for year-over-year comparisons, growth analysis, performance trends.
-   Filters: metric (sales, margin, units, margin_rate), group_by (division, region, brand, category), division, region, category, brand
-   Triggers: "grew", "vs last year", "year over year", "performance", "top/bottom by", "worst/best"
+TOOL 2: "brand_region_crosstab"
+  Description: Compare brands across regions, rank brands by a metric, brand performance analysis.
+  Example questions:
+    - "Show me the top brands by sales in the West region"
+    - "Which brands perform best in the North?"
+    - "Show me Novex sales across all regions"
+    - "What are the best-selling brands?"
+    - "How do brands compare by region?"
+  Strong keywords: "brand", "brands", "top brands", "best brands", "which brands", "brand performance", "Novex", "Vetra", "Trion", "Zentra", "Dexon", "Fynix", "Kryta", "Lumix", "Quanta", "Solvo"
 
-2. "brand_region_crosstab" - Use for comparing brands across regions, or regional performance by brand.
-   Filters: metric (default "sales")
-   Triggers: "brands in region", "regional performance", "cross-tab", "heatmap", "which brands"
+TOOL 3: "forecast_trendline"
+  Description: Project future performance, 2025 forecasts, trend analysis.
+  Example questions:
+    - "Project Apparel division sales into 2025"
+    - "What will West region sales look like next year?"
+    - "Forecast Sports division trajectory"
+    - "Predict 2025 margin for Gardening"
+    - "What is the sales trend for Tools?"
+  Strong keywords: "project", "forecast", "2025", "future", "trajectory", "predict", "next year", "going forward"
 
-3. "forecast_trendline" - Use for projections, trends, forecasts into 2025.
-   Filters: group_by (one of "division","region","brand","category"), group_value, metric
-   Triggers: "project", "forecast", "trend", "trajectory", "predict", "2025"
+TOOL 4: "anomaly_detection"
+  Description: Find outliers, unusual patterns, data anomalies.
+  Example questions:
+    - "Are there any pricing anomalies in Sports?"
+    - "Flag any unusual margin patterns"
+    - "What looks off in the data?"
+    - "Find outliers in the West region"
+    - "Any weird sales patterns?"
+  Strong keywords: "anomaly", "anomalies", "outlier", "unusual", "flag", "weird", "unexpected", "looks off", "strange"
 
-4. "anomaly_detection" - Use for finding outliers, unusual patterns, anomalies.
-   Filters: metric (default "margin_rate"), division, region
-   Triggers: "anomaly", "outlier", "unusual", "flag", "looks off", "weird"
+TOOL 5: "price_volume_margin"
+  Description: Price-margin-volume relationships, pricing sweet spot analysis.
+  Example questions:
+    - "What is the pricing sweet spot for Tools?"
+    - "Show me price vs margin relationship in Apparel"
+    - "How does price relate to volume in Sports?"
+    - "Where is the optimal price point?"
+    - "Visualize the price-volume-margin tradeoff"
+  Strong keywords: "pricing", "sweet spot", "price vs margin", "price point", "price relationship", "price volume"
 
-5. "price_volume_margin" - Use for price-margin-volume relationships, pricing analysis.
-   Filters: division, category
-   Triggers: "price", "pricing", "sweet spot", "price vs margin", "relationship between price"
+TOOL 6: "store_performance"
+  Description: Store-level analysis — top/bottom stores, store size vs performance.
+  Example questions:
+    - "Which stores are underperforming?"
+    - "Show me the top 10 stores by sales"
+    - "Do larger stores perform better?"
+    - "Which locations are the worst?"
+    - "Bottom 5 stores by margin"
+  Strong keywords: "store", "stores", "location", "underperforming", "top stores", "bottom stores", "store size"
 
-6. "store_performance" - Use for store-level analysis: top/bottom stores, store size vs performance.
-   Filters: metric (sales, margin, units, margin_rate), top_n (integer, default 10), view ("top" or "bottom"), division, region, category, brand
-   Triggers: "store", "stores", "underperforming", "top stores", "bottom stores", "store size", "larger stores", "which locations"
+TOOL 7: "seasonality_trends"
+  Description: Monthly or quarterly seasonal patterns overlaid across years.
+  Example questions:
+    - "Is there a seasonal pattern in Gardening?"
+    - "Which month has peak sales?"
+    - "Show me quarterly trends for Sports"
+    - "When do sales peak?"
+    - "Compare monthly patterns 2023 vs 2024"
+  Strong keywords: "season", "seasonal", "monthly", "quarterly", "peak", "which month", "which quarter", "time trend"
 
-7. "seasonality_trends" - Use for within-year seasonal patterns, monthly or quarterly trends overlaid across years.
-   Filters: time_grain ("month" or "quarter"), metric, division, region, category, brand
-   Triggers: "season", "seasonal", "monthly", "quarterly", "when do", "peak", "which quarter", "which month", "time trend", "within-year"
+TOOL 8: "division_mix"
+  Description: Revenue mix by division, portfolio share, how divisions split total business.
+  Example questions:
+    - "What percentage of sales does each division represent?"
+    - "Show me the revenue mix"
+    - "How is the portfolio balanced?"
+    - "Which division has the biggest share?"
+    - "Division proportion of total sales"
+  Strong keywords: "mix", "percentage", "share", "proportion", "portfolio balance", "revenue mix", "each division represent"
 
-8. "division_mix" - Use for revenue/sales mix by division, portfolio balance, how divisions share total business.
-   Filters: metric (sales, margin, units), division, region, category, brand
-   Triggers: "mix", "percentage", "share", "proportion", "concentrated", "revenue mix", "product mix", "each division represent", "portfolio balance"
+TOOL 9: "margin_waterfall"
+  Description: Decompose YoY margin/sales changes — what drove the change.
+  Example questions:
+    - "Why did our margins change?"
+    - "What drove the sales increase?"
+    - "Break down the margin change by division"
+    - "Which divisions contributed to profit growth?"
+    - "Show me a waterfall of margin changes"
+  Strong keywords: "waterfall", "what drove", "why did margin", "margins change", "decomposition", "break down", "contributed"
 
-9. "margin_waterfall" - Use for explaining what drove margin or sales changes between years, decomposition by division.
-   Filters: metric (margin, sales, units), group_by (division, region, brand, category), division, region, category, brand
-   Triggers: "waterfall", "margin change", "why did margins", "break down", "contributed", "profit growth", "decomposition", "what drove"
+TOOL 10: "kpi_scorecard"
+  Description: Full-business executive overview, health check, KPI dashboard. NO filters needed.
+  Example questions:
+    - "How is the business performing overall?"
+    - "Give me a KPI dashboard"
+    - "Executive summary of the business"
+    - "Show me the scorecard"
+    - "Summarize everything"
+  Strong keywords: "overall", "overview", "scorecard", "dashboard", "health", "kpi", "summarize everything", "how is the business"
 
-10. "kpi_scorecard" - Use for a full-business executive overview, health check, KPI dashboard. No filters needed.
-    Filters: none
-    Triggers: "overview", "scorecard", "summary", "business health", "how is the business", "KPI", "overall performance", "dashboard", "summarize everything"
+TOOL 11: "price_elasticity"
+  Description: Estimate price sensitivity, demand elasticity, impact of price changes.
+  Example questions:
+    - "Which categories are most price sensitive?"
+    - "What is the price elasticity for Sports?"
+    - "What happens if we raise prices?"
+    - "How sensitive is demand to price?"
+    - "Impact of price change on volume"
+  Strong keywords: "elasticity", "price sensitive", "raise prices", "demand sensitivity", "impact of price change"
 
-11. "price_elasticity" - Use for estimating price sensitivity, demand elasticity, impact of price changes on volume.
-    Filters: division, region, category, brand
-    Triggers: "elasticity", "price sensitive", "raise prices", "what happens if", "impact of price change", "demand sensitivity"
+TOOL 12: "brand_benchmarking"
+  Description: Head-to-head brand comparisons within categories, market share by brand.
+  Example questions:
+    - "Which brand owns the Fitness category?"
+    - "Compare brands in Gardening"
+    - "Who dominates Apparel by market share?"
+    - "Brand head-to-head in Tools"
+    - "Which brand leads in Sports?"
+  Strong keywords: "who owns", "brand dominance", "head-to-head", "benchmarking", "which brand leads", "compare brands", "brand vs"
 
-12. "brand_benchmarking" - Use for head-to-head brand comparisons within categories, market share by brand.
-    Filters: metric (sales, margin, units), division, region, category, brand
-    Triggers: "compare brands", "brand vs", "market share", "who owns", "brand dominance", "head-to-head", "benchmarking", "which brand leads"
+TOOL 13: "growth_margin_matrix"
+  Description: BCG-style strategic 2x2 matrix — stars, cash cows, question marks, dogs.
+  Example questions:
+    - "Where are our stars and dogs?"
+    - "Show me the BCG matrix"
+    - "Which divisions should we invest in?"
+    - "Strategic portfolio view"
+    - "Growth vs margin quadrant analysis"
+  Strong keywords: "stars", "dogs", "cash cows", "BCG", "quadrant", "portfolio strategy", "growth margin matrix", "invest"
 
-13. "growth_margin_matrix" - Use for strategic portfolio view (BCG-style), identifying stars, cash cows, question marks, dogs.
-    Filters: group_by (division or category), division, region, category, brand
-    Triggers: "strategic", "stars", "dogs", "cash cows", "BCG", "invest", "portfolio strategy", "growth margin matrix", "2x2", "quadrant"
+=== SECTION 2: FILTER EXTRACTION RULES ===
+
+Extract ALL filters mentioned in the question. Never return an empty filters object. Always include at minimum the metric field.
+
+Valid filter values — extract EXACTLY as written:
+- region: ONLY one of {df_summary['regions']} — or null if not mentioned
+- division: ONLY one of {df_summary['divisions']} — or null if not mentioned
+- category: ONLY one of {df_summary['categories']} — or null if not mentioned
+- brand: ONLY one of {df_summary['brands']} — or null if not mentioned
+- metric: ONLY one of ["sales", "margin", "units", "margin_rate"] — DEFAULT to "sales" if not specified
+- group_by: one of ["division", "region", "brand", "category"] — or null
+- group_value: string matching a specific value for group_by — or null
+- time_grain: "month" or "quarter" — or null
+- top_n: integer if user says "top 5", "top 10" etc — or null
+- view: "top" or "bottom" — or null
+
+If the user says "West" → region: "West"
+If the user says "Apparel" → division: "Apparel"
+If the user says "Novex" → brand: "Novex"
+If the user says "margin" → metric: "margin"
+
+=== SECTION 3: WORKED EXAMPLES ===
+
+Q: "Show me the top brands by sales in the West region"
+A: {{{{"tool": "brand_region_crosstab", "filters": {{"region": "West", "metric": "sales"}}}}}}
+
+Q: "Which division grew the most year over year?"
+A: {{{{"tool": "yoy_comparison", "filters": {{"metric": "sales", "group_by": "division"}}}}}}
+
+Q: "Which brand grew the most year over year?"
+A: {{{{"tool": "yoy_comparison", "filters": {{"metric": "sales", "group_by": "brand"}}}}}}
+
+Q: "How did Apparel perform compared to last year in the East?"
+A: {{{{"tool": "yoy_comparison", "filters": {{"division": "Apparel", "region": "East", "metric": "sales"}}}}}}
+
+Q: "Which brands perform best in the North region?"
+A: {{{{"tool": "brand_region_crosstab", "filters": {{"region": "North", "metric": "sales"}}}}}}
+
+Q: "Project West region sales into 2025"
+A: {{{{"tool": "forecast_trendline", "filters": {{"group_by": "region", "group_value": "West", "metric": "sales"}}}}}}
+
+Q: "Are there any pricing anomalies in the Sports division?"
+A: {{{{"tool": "anomaly_detection", "filters": {{"division": "Sports", "metric": "margin_rate"}}}}}}
+
+Q: "What is the relationship between price and margin in Apparel?"
+A: {{{{"tool": "price_volume_margin", "filters": {{"division": "Apparel", "metric": "sales"}}}}}}
+
+Q: "Show me Novex sales across all regions"
+A: {{{{"tool": "brand_region_crosstab", "filters": {{"brand": "Novex", "metric": "sales"}}}}}}
+
+Q: "Which stores are underperforming?"
+A: {{{{"tool": "store_performance", "filters": {{"metric": "sales", "view": "bottom", "top_n": 10}}}}}}
+
+Q: "How is the business performing overall?"
+A: {{{{"tool": "kpi_scorecard", "filters": {{"metric": "sales"}}}}}}
+
+Q: "Why did our margins change?"
+A: {{{{"tool": "margin_waterfall", "filters": {{"metric": "margin", "group_by": "division"}}}}}}
+
+Q: "Is there a seasonal pattern in Gardening?"
+A: {{{{"tool": "seasonality_trends", "filters": {{"division": "Gardening", "metric": "sales", "time_grain": "month"}}}}}}
+
+Q: "Where are our stars and dogs?"
+A: {{{{"tool": "growth_margin_matrix", "filters": {{"metric": "sales", "group_by": "division"}}}}}}
+
+=== SECTION 4: OUTPUT FORMAT RULES ===
 
 Session memory (context from prior questions):
 {memory_block}
 
-IMPORTANT RULES:
 - If the user references "that region", "the top brand", "it", etc., resolve from session memory above.
-- If the user mentions a specific region, division, category, or brand, you MUST include it in the 'filters' dictionary! Do not leave it null if mentioned.
-- If the user asks for a specific metric (e.g. "margin", "units"), you MUST include it in the 'filters' dictionary (e.g. "metric": "margin").
-- If the user asks to see data "by brand" or "top brands", set "group_by": "brand". If they ask "by category", set "group_by": "category".
-- Always pick the MOST APPROPRIATE tool. When in doubt, use yoy_comparison.
-- Your ONLY job is to pick the tool and filters. Do NOT generate insights.
+- Your ONLY job is to pick the tool and extract filters. Do NOT generate insights or suggestions.
 
-You MUST respond with ONLY a valid JSON object in this EXACT format, nothing else:
-{{{{
-  "tool": "yoy_comparison",
-  "filters": {{{{
-    "metric": "sales",
-    "division": "Apparel",
-    "region": "West",
-    "category": null,
-    "brand": "Nike",
-    "group_by": null,
-    "group_value": null,
-    "time_grain": null,
-    "top_n": null,
-    "view": null
-  }}}}
-}}}}
+You MUST always return valid JSON and nothing else. No explanation before or after the JSON. No markdown code blocks. No backticks. Raw JSON only.
 
-Do NOT include any text, explanation, or markdown outside the JSON object.
-Do NOT wrap the JSON in code fences.
+The JSON must contain exactly these 2 keys:
+- "tool" (string — one of the 13 tool names above)
+- "filters" (object — never empty, always include metric)
+
+If you are unsure which tool to pick:
+- If the question mentions brands → use "brand_region_crosstab"
+- If the question mentions growth or time periods → use "yoy_comparison"
+- Otherwise default to "yoy_comparison"
+
 Respond with ONLY the JSON object."""
 
     return prompt
@@ -279,6 +404,201 @@ def extract_json_from_response(raw_text: str) -> dict:
     raise ValueError(f"Could not extract valid JSON from LLM response: {text[:200]}")
 
 
+# =====================================================================
+#  ROUTING GUARD & FILTER EXTRACTION (Safety nets for the small LLM)
+# =====================================================================
+
+# Brand names from the dataset — used by keyword guard
+_BRAND_NAMES = [
+    "novex", "vetra", "trion", "zentra", "dexon",
+    "fynix", "kryta", "lumix", "quanta", "solvo",
+]
+
+# Canonical filter values for extraction fallback
+_REGIONS = ["East", "West", "Central", "Atlantic"]
+_DIVISIONS = ["Apparel", "Tools", "Sports", "Gardening", "Food"]
+_BRANDS_TITLE = ["Novex", "Vetra", "Trion", "Zentra", "Dexon",
+                 "Fynix", "Kryta", "Lumix", "Quanta", "Solvo"]
+
+
+def validate_routing(question: str, llm_tool: str) -> str:
+    """
+    Safety net that overrides incorrect LLM tool selection
+    based on keyword matching.  Runs before tool_router.
+
+    Checks keywords in priority order — specialised tools first,
+    generic yoy_comparison last.
+    """
+    q = question.lower()
+
+    # ── Brand keywords — highest priority ───────────────────
+    brand_keywords = [
+        "brand", "brands", "top brands", "best brands", "which brands",
+        "brand performance",
+    ] + _BRAND_NAMES
+    if any(kw in q for kw in brand_keywords):
+        # But NOT if the question is really about YoY brand growth
+        yoy_signals = ["year over year", "yoy", "grew", "growth rate",
+                       "vs last year", "compared to last year",
+                       "2023 vs 2024", "change over time"]
+        if not any(yw in q for yw in yoy_signals):
+            return "brand_region_crosstab"
+
+    # ── KPI / overview ──────────────────────────────────────
+    overview_kw = ["overall", "overview", "scorecard", "dashboard",
+                   "health", "kpi", "summarize everything",
+                   "how is the business"]
+    if any(kw in q for kw in overview_kw):
+        return "kpi_scorecard"
+
+    # ── Waterfall / margin decomposition ────────────────────
+    waterfall_kw = ["waterfall", "what drove", "why did margin",
+                    "margins change", "decomposition", "break down",
+                    "margin change", "contributed to"]
+    if any(kw in q for kw in waterfall_kw):
+        return "margin_waterfall"
+
+    # ── BCG / growth-margin matrix ──────────────────────────
+    bcg_kw = ["stars", "dogs", "cash cow", "bcg", "quadrant",
+              "growth margin matrix", "portfolio strategy"]
+    if any(kw in q for kw in bcg_kw):
+        return "growth_margin_matrix"
+
+    # ── Elasticity ──────────────────────────────────────────
+    elasticity_kw = ["elasticity", "price sensitive", "raise prices",
+                     "demand sensitivity", "impact of price change"]
+    if any(kw in q for kw in elasticity_kw):
+        return "price_elasticity"
+
+    # ── Seasonality ─────────────────────────────────────────
+    season_kw = ["season", "seasonal", "monthly", "quarterly",
+                 "peak", "which month", "which quarter", "time trend"]
+    if any(kw in q for kw in season_kw):
+        return "seasonality_trends"
+
+    # ── Store performance ───────────────────────────────────
+    store_kw = ["store", "stores", "location", "locations",
+                "underperforming", "top stores", "bottom stores",
+                "store size"]
+    if any(kw in q for kw in store_kw):
+        return "store_performance"
+
+    # ── Division mix ────────────────────────────────────────
+    mix_kw = ["mix", "percentage", "proportion", "portfolio balance",
+              "revenue mix", "each division represent"]
+    if any(kw in q for kw in mix_kw):
+        # Exclude if it's about YoY share *change*
+        yoy_signals = ["year over year", "yoy", "grew", "growth",
+                       "vs last year", "change"]
+        if not any(yw in q for yw in yoy_signals):
+            return "division_mix"
+
+    # ── Forecast ────────────────────────────────────────────
+    forecast_kw = ["project", "forecast", "2025", "future",
+                   "trajectory", "predict", "next year",
+                   "going forward"]
+    if any(kw in q for kw in forecast_kw):
+        return "forecast_trendline"
+
+    # ── Anomaly ─────────────────────────────────────────────
+    anomaly_kw = ["anomal", "outlier", "unusual", "anything off",
+                  "flag", "weird", "unexpected", "looks off",
+                  "strange"]
+    if any(kw in q for kw in anomaly_kw):
+        return "anomaly_detection"
+
+    # ── Price / PVM ─────────────────────────────────────────
+    price_kw = ["pricing", "sweet spot", "price vs margin",
+                "price point", "price sensitivity",
+                "price volume", "price relationship"]
+    if any(kw in q for kw in price_kw):
+        return "price_volume_margin"
+
+    # ── Brand benchmarking ──────────────────────────────────
+    bench_kw = ["who owns", "brand dominance", "head-to-head",
+                "benchmarking", "which brand leads",
+                "compare brands", "brand vs"]
+    if any(kw in q for kw in bench_kw):
+        return "brand_benchmarking"
+
+    # ── YoY (last resort explicit check) ────────────────────
+    yoy_kw = ["year over year", "yoy", "grew", "growth rate",
+              "vs last year", "compared to last year",
+              "2023 vs 2024", "change over time", "perform last year"]
+    if any(kw in q for kw in yoy_kw):
+        return "yoy_comparison"
+
+    # No keywords matched — trust LLM
+    return llm_tool
+
+
+def extract_missing_filters(question: str, existing_filters: dict) -> dict:
+    """
+    Scan the question for filter values the LLM missed.
+    Fills gaps without overwriting correct values.
+    """
+    q = question.lower()
+    filters = existing_filters.copy()
+
+    # Region extraction fallback
+    if not filters.get("region") or str(filters["region"]).lower() in ("null", "none"):
+        for region in _REGIONS:
+            if region.lower() in q:
+                filters["region"] = region
+                break
+
+    # Division extraction fallback
+    if not filters.get("division") or str(filters["division"]).lower() in ("null", "none"):
+        for division in _DIVISIONS:
+            if division.lower() in q:
+                filters["division"] = division
+                break
+
+    # Brand extraction fallback
+    if not filters.get("brand") or str(filters["brand"]).lower() in ("null", "none"):
+        for brand in _BRANDS_TITLE:
+            if brand.lower() in q:
+                filters["brand"] = brand
+                break
+
+    # Metric default fallback
+    if not filters.get("metric") or str(filters["metric"]).lower() in ("null", "none"):
+        if any(w in q for w in ["margin rate", "margin_rate"]):
+            filters["metric"] = "margin_rate"
+        elif "margin" in q:
+            filters["metric"] = "margin"
+        elif "unit" in q:
+            filters["metric"] = "units"
+        else:
+            filters["metric"] = "sales"
+
+    # top_n extraction fallback
+    if not filters.get("top_n") or str(filters["top_n"]).lower() in ("null", "none"):
+        match = re.search(r"top\s+(\d+)", q)
+        if match:
+            filters["top_n"] = int(match.group(1))
+
+    # view extraction fallback (top/bottom)
+    if not filters.get("view") or str(filters["view"]).lower() in ("null", "none"):
+        if "bottom" in q or "worst" in q or "underperform" in q:
+            filters["view"] = "bottom"
+        elif "top" in q and "store" in q:
+            filters["view"] = "top"
+
+    # group_by extraction fallback (for yoy_comparison)
+    if not filters.get("group_by") or str(filters["group_by"]).lower() in ("null", "none"):
+        if any(w in q for w in ["brand", "brands"]):
+            filters["group_by"] = "brand"
+        elif any(w in q for w in ["category", "categories"]):
+            filters["group_by"] = "category"
+        elif any(w in q for w in ["region", "regions"]) and not filters.get("region"):
+            # "Which region grew?" → group by region
+            # "How did East perform?" → filter by region, group by division
+            filters["group_by"] = "region"
+
+    return filters
+
+
 def validate_llm_response(parsed: dict) -> dict:
     """
     Validate and fix a parsed LLM JSON response (Pass 1 - routing only).
@@ -310,12 +630,79 @@ def validate_llm_response(parsed: dict) -> dict:
     return result
 
 
+def clean_insight_text(text: str) -> str:
+    """
+    Aggressively removes all markdown formatting from LLM insight text.
+    Uses direct string replacement for backticks before regex runs
+    to catch all possible backtick patterns the LLM may produce.
+    """
+    # STEP 1 — Direct string replacement for backticks (catches everything)
+    # Remove triple backticks and any language hints (```python, ```json etc)
+    while '```' in text:
+        text = re.sub(r'```[a-zA-Z]*', '', text)
+        text = text.replace('```', '')
+
+    # Remove ALL remaining single backticks — just strip them entirely
+    text = text.replace('`', '')
+
+    # STEP 2 — Remove bold markdown
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+    text = re.sub(r'__(.*?)__', r'\1', text)
+
+    # STEP 3 — Remove italic markdown
+    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    text = re.sub(r'_(.*?)_', r'\1', text)
+
+    # STEP 4 — Remove markdown headers
+    text = re.sub(r'^#{1,6}\s+', '', text, flags=re.MULTILINE)
+
+    # STEP 5 — Normalize whitespace
+    text = re.sub(r'  +', ' ', text)
+    text = re.sub(r'\n+', ' ', text)
+
+    return text.strip()
+
+
+def validate_insight_format(insight: str, filters: dict) -> str:
+    """
+    Validate that the insight is proper narrative text.
+    Returns a clean fallback if the insight looks like structured data.
+    """
+    # Red flags that indicate structured data leaked into insight
+    red_flags = [
+        "Best region: Value",
+        "Regional totals:",
+        "Bottom 3",
+        "Top 5 brands:",
+        "Top 10 brands:",
+        "Here are the key findings",
+        "_value",
+        ": Value (",
+        "\u2022",  # bullet •
+    ]
+
+    has_red_flag = any(flag in insight for flag in red_flags)
+    too_long = len(insight) > 600
+    too_many_bullets = insight.count("\u2022") > 2 or insight.count("- ") > 3
+
+    if has_red_flag or too_long or too_many_bullets:
+        region = filters.get("region", "all regions")
+        metric = filters.get("metric", "sales")
+        return (
+            f"Analysis complete for {region}. "
+            f"The chart above shows the full breakdown by brand and {metric}. "
+            f"Use the follow-up questions below to drill deeper into specific brands or regions."
+        )
+
+    return insight
+
+
 def validate_insight_response(parsed: dict) -> dict:
     """
     Validate and fix a parsed LLM JSON response (Pass 2 - insight generation).
 
     Ensures:
-    - 'insight' is a non-empty string
+    - 'insight' is a non-empty string (markdown stripped)
     - 'suggestions' is a list of 3 strings
 
     Args:
@@ -329,6 +716,14 @@ def validate_insight_response(parsed: dict) -> dict:
     # Ensure insight is a string
     if not isinstance(result.get("insight"), str) or not result["insight"].strip():
         result["insight"] = "Here is the analysis based on the available data."
+
+    # Strip any markdown formatting the LLM may have added
+    result["insight"] = clean_insight_text(result["insight"])
+
+    # Validate insight is narrative text, not structured data
+    result["insight"] = validate_insight_format(
+        result["insight"], result.get("filters", {})
+    )
 
     # Ensure suggestions is a list of 3 strings
     if not isinstance(result.get("suggestions"), list) or len(result["suggestions"]) < 1:
@@ -382,6 +777,18 @@ def ask_llm(question: str, session_memory: dict, df_summary: dict) -> dict:
         # Try to extract and validate JSON
         parsed = extract_json_from_response(raw_text)
         validated = validate_llm_response(parsed)
+
+        # Safety net: keyword guard overrides bad tool selection
+        original_tool = validated["tool"]
+        validated["tool"] = validate_routing(question, validated["tool"])
+
+        # Safety net: fill any filters the LLM missed
+        validated["filters"] = extract_missing_filters(question, validated["filters"])
+
+        # Track whether we overrode for debug visibility
+        if validated["tool"] != original_tool:
+            validated["_routing_override"] = f"{original_tool} → {validated['tool']}"
+
         return validated
 
     except ValueError:
@@ -434,12 +841,23 @@ Here are the ACTUAL DATA RESULTS from the analysis:
 Based on these real numbers, write a business insight and suggest follow-up questions.
 
 RULES FOR YOUR INSIGHT:
-- Reference SPECIFIC numbers, percentages, and entity names from the data above.
-- Explain what the numbers MEAN for the business.
-- Include business reasoning: WHY might these patterns exist? Use general terms like 'seasonality' or 'promotional activity' when speculating.
-- If there are notable outliers or surprises in the data, call them out.
-- Write 3-5 sentences. Be specific and analytical, not vague.
-- Do NOT say "likely shows" or "may indicate" - you have the real data, so state facts.
+CRITICAL: Never use backtick characters anywhere in your response. Not for numbers, not for brand names, not for code, not for anything. The backtick character is completely forbidden in all fields including insight and suggestions.
+The insight field must be exactly 2-3 complete English sentences. Write it as a business analyst summarizing findings for a VP or senior leader. Rules:
+- Never use bullet points or lists of any kind
+- Never use raw column names (never write 'Value', '_value', 'metric')
+- Never include structured data sections like 'Top 5:' or 'Bottom 3:'
+- Always reference specific brand names, dollar amounts, and regions
+- Always include one business implication or recommendation
+- Write in third person present tense
+- Do NOT say "likely shows" or "may indicate" - you have the real data, so state facts
+- Never use markdown formatting. No asterisks, no underscores, no backticks, no bold, no italics. Plain sentences only.
+- Never wrap numbers, brand names, or any words in backticks. Never use inline code formatting. Write all numbers as plain text with commas and dollar signs only. Example: write $59,363 not `59,363`.
+
+Good example:
+"Lumix leads West region sales at $59,363, followed closely by Zentra at $57,292 and Novex at $52,362. The top 3 brands account for over half of total West region revenue, indicating high brand concentration. Brands like Dexon and Trion are significantly underperforming and may warrant a regional assortment review."
+
+Bad example (NEVER do this):
+"Top 5 brands: Lumix: 59,363. Best region: Value (59,363). Bottom 3 brands: Solvo: $34,854. Regional totals: Value: $417,516"
 
 STRICT CONSTRAINTS:
 - Do NOT reference specific external companies, retailers, or brand names (e.g. 'Canadian Tire', 'Walmart', 'Amazon') unless they appear in the data results above.
@@ -451,9 +869,22 @@ RULES FOR SUGGESTIONS:
 - Suggest 3 follow-up questions that reference specific entities from the data.
 - Each question should help the user dig deeper into interesting findings.
 
+Here is a complete WORKED EXAMPLE of what a correct JSON response looks like:
+
+Q: "Show me the top brands by sales in the West region"
+A:
+{{{{
+  "insight": "Lumix leads West region sales at $59,363, followed by Zentra at $57,292 and Novex at $52,362. The top 3 brands control the majority of West region revenue, suggesting strong brand loyalty in this market. Underperforming brands like Dexon and Trion may benefit from targeted promotions or regional assortment changes.",
+  "suggestions": [
+    "How do these brands perform in the East region?",
+    "Show me the margin rate for top brands in the West",
+    "Which categories drive Lumix sales in the West?"
+  ]
+}}}}
+
 You MUST respond with ONLY a valid JSON object in this EXACT format:
 {{{{
-  "insight": "Your 3-5 sentence data-driven business insight here.",
+  "insight": "Your 2-3 sentence data-driven business insight here.",
   "suggestions": [
     "Follow-up question 1",
     "Follow-up question 2",
@@ -501,10 +932,11 @@ def generate_insight(
         return validated
 
     except Exception:
-        # If Pass 2 fails, use the data summary directly as the insight
+        # If Pass 2 fails, return a clean generic fallback
         return {
             "insight": (
-                f"Here are the key findings from the analysis:\n\n{data_summary}"
+                "Analysis complete. The chart above shows the full breakdown. "
+                "Use the follow-up questions below to drill deeper into the data."
             ),
             "suggestions": [
                 "Show me the overall sales trend",

@@ -63,9 +63,16 @@ def tool_router(tool_name: str, filters: dict, df: pd.DataFrame) -> tuple:
         return fig, summary, None
 
     elif tool_name == "brand_region_crosstab":
+        top_n_val = clean.get("top_n")
+        if top_n_val is not None:
+            try:
+                top_n_val = int(top_n_val)
+            except (ValueError, TypeError):
+                top_n_val = None
         fig, summary = brand_region_crosstab(
             df,
             metric=clean.get("metric", "sales"),
+            top_n=top_n_val,
             **common_filters,
         )
         return fig, summary, None

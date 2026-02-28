@@ -14,50 +14,68 @@ def summarize_yoy(result_df: pd.DataFrame, metric: str = "sales") -> str:
     """
     Summarize YoY comparison results.
 
-    Extracts top/bottom growers, percentage changes, and total values
-    so the LLM can reference actual numbers in its insight.
+    Produces a directive summary that ensures the LLM references both
+    the top grower AND the worst performer (especially declines).
     """
     if result_df is None or result_df.empty:
         return "No year-over-year data available."
 
     lines = []
     group_col = result_df.columns[0]  # first column is the grouping axis
+    metric_label = metric.replace("_", " ").title()
 
     # Check if we have Change % column
     if "Change %" in result_df.columns and "Change" in result_df.columns:
-        # Sort by Change % to find top and bottom growers
         sorted_df = result_df.sort_values("Change %", ascending=False)
 
         # Top grower
         top = sorted_df.iloc[0]
+        yr_2023_top = top.get(2023, top.get("2023", 0))
+        yr_2024_top = top.get(2024, top.get("2024", 0))
         lines.append(
-            f"Strongest growth: {top[group_col]} at {top['Change %']:+.1f}% "
-            f"(change of {top['Change']:+,.0f})"
+            f"BEST PERFORMER: {top[group_col]} grew {top['Change %']:+.1f}% YoY, "
+            f"from ${yr_2023_top:,.0f} in 2023 to ${yr_2024_top:,.0f} in 2024 "
+            f"(+${top['Change']:,.0f} increase)."
         )
 
-        # Bottom grower
+        # Bottom grower — flag declines prominently
         bottom = sorted_df.iloc[-1]
-        lines.append(
-            f"Weakest performance: {bottom[group_col]} at {bottom['Change %']:+.1f}% "
-            f"(change of {bottom['Change']:+,.0f})"
-        )
+        yr_2023_bot = bottom.get(2023, bottom.get("2023", 0))
+        yr_2024_bot = bottom.get(2024, bottom.get("2024", 0))
+        if bottom["Change %"] < 0:
+            lines.append(
+                f"KEY RISK: {bottom[group_col]} DECLINED {bottom['Change %']:+.1f}% YoY, "
+                f"falling from ${yr_2023_bot:,.0f} to ${yr_2024_bot:,.0f} "
+                f"(lost ${abs(bottom['Change']):,.0f} in {metric_label.lower()}). "
+                f"This decline MUST be mentioned in the insight."
+            )
+        else:
+            lines.append(
+                f"WEAKEST PERFORMER: {bottom[group_col]} at {bottom['Change %']:+.1f}% YoY, "
+                f"from ${yr_2023_bot:,.0f} to ${yr_2024_bot:,.0f}."
+            )
 
-        # List all items with their values
-        lines.append(f"\nAll {group_col.replace('_', ' ').lower()} results:")
+        # All items
+        lines.append(f"\nFull {metric_label} results by {group_col.replace('_', ' ').lower()}:")
         for _, row in sorted_df.iterrows():
             yr_2023 = row.get(2023, row.get("2023", 0))
             yr_2024 = row.get(2024, row.get("2024", 0))
             lines.append(
-                f"  - {row[group_col]}: 2023=${yr_2023:,.0f}, 2024=${yr_2024:,.0f}, "
-                f"change={row['Change %']:+.1f}%"
+                f"  {row[group_col]}: 2023=${yr_2023:,.0f}, 2024=${yr_2024:,.0f}, "
+                f"change={row['Change %']:+.1f}%, dollar change=${row['Change']:+,.0f}"
             )
+
+        lines.append(
+            "\nINSTRUCTION: Your insight MUST mention both the best performer "
+            "and the worst performer. If any declined, flag it as a risk. "
+            "Use the exact percentages and dollar amounts above."
+        )
     else:
-        # No change columns, just list values
         lines.append(f"Results by {group_col.replace('_', ' ').lower()}:")
         for _, row in result_df.iterrows():
-            vals = [f"{col}={row[col]:,.0f}" for col in result_df.columns[1:]
+            vals = [f"{col}=${row[col]:,.0f}" for col in result_df.columns[1:]
                     if pd.notna(row[col])]
-            lines.append(f"  - {row[group_col]}: {', '.join(vals)}")
+            lines.append(f"  {row[group_col]}: {', '.join(vals)}")
 
     return "\n".join(lines)
 
@@ -66,38 +84,57 @@ def summarize_crosstab(result_df: pd.DataFrame, metric: str = "sales") -> str:
     """
     Summarize Brand x Region crosstab results.
 
-    Finds the top brands, strongest regions, and notable patterns.
+    Handles two formats:
+    - Single-region bar chart: columns are ['Brand', 'Value']
+    - Multi-region heatmap:    columns are ['BRAND', 'East', 'West', ...]
     """
     if result_df is None or result_df.empty:
         return "No cross-tab data available."
 
     lines = []
-    brand_col = result_df.columns[0]  # should be BRAND
-    region_cols = [c for c in result_df.columns if c != brand_col]
+    brand_col = result_df.columns[0]  # 'Brand' or 'BRAND'
+    other_cols = [c for c in result_df.columns if c != brand_col]
 
-    # Add totals per brand
-    result_copy = result_df.copy()
-    result_copy["Total"] = result_copy[region_cols].sum(axis=1)
-    result_copy = result_copy.sort_values("Total", ascending=False)
+    # Detect single-region bar chart format (columns: Brand, Value)
+    if len(other_cols) == 1 and other_cols[0] == "Value":
+        # Single-region ranked bar chart output
+        metric_label = metric.replace("_", " ").title()
+        sorted_df = result_df.sort_values("Value", ascending=False)
+        lines.append(f"Brands ranked by {metric_label} (highest to lowest):")
+        for rank, (_, row) in enumerate(sorted_df.iterrows(), 1):
+            if metric == "margin_rate":
+                lines.append(f"  {rank}. {row[brand_col]}: {row['Value']:.1%}")
+            else:
+                lines.append(f"  {rank}. {row[brand_col]}: ${row['Value']:,.0f}")
 
-    # Top 5 brands
-    lines.append("Top 5 brands by total across all regions:")
-    for _, row in result_copy.head(5).iterrows():
-        lines.append(f"  - {row[brand_col]}: ${row['Total']:,.0f}")
-        # Find their best region
-        best_region = max(region_cols, key=lambda r: row[r])
-        lines.append(f"    Best region: {best_region} (${row[best_region]:,.0f})")
+        # Highlight top and bottom
+        top_row = sorted_df.iloc[0]
+        bot_row = sorted_df.iloc[-1]
+        if metric == "margin_rate":
+            lines.append(f"\nTop brand: {top_row[brand_col]} at {top_row['Value']:.1%}")
+            lines.append(f"Bottom brand: {bot_row[brand_col]} at {bot_row['Value']:.1%}")
+        else:
+            gap = top_row['Value'] - bot_row['Value']
+            lines.append(f"\nTop brand: {top_row[brand_col]} at ${top_row['Value']:,.0f}")
+            lines.append(f"Bottom brand: {bot_row[brand_col]} at ${bot_row['Value']:,.0f}")
+            lines.append(f"Gap between top and bottom: ${gap:,.0f}")
+    else:
+        # Multi-region heatmap output
+        region_cols = other_cols
+        result_copy = result_df.copy()
+        result_copy["Total"] = result_copy[region_cols].sum(axis=1)
+        result_copy = result_copy.sort_values("Total", ascending=False)
 
-    # Weakest brands
-    lines.append("\nBottom 3 brands:")
-    for _, row in result_copy.tail(3).iterrows():
-        lines.append(f"  - {row[brand_col]}: ${row['Total']:,.0f}")
+        lines.append("Brands ranked by total across all regions:")
+        for rank, (_, row) in enumerate(result_copy.iterrows(), 1):
+            lines.append(f"  {rank}. {row[brand_col]}: ${row['Total']:,.0f}")
+            best_region = max(region_cols, key=lambda r: row[r])
+            lines.append(f"     Strongest region: {best_region} (${row[best_region]:,.0f})")
 
-    # Regional totals
-    lines.append("\nRegional totals:")
-    for region in region_cols:
-        total = result_df[region].sum()
-        lines.append(f"  - {region}: ${total:,.0f}")
+        lines.append("\nRegional totals:")
+        for region in region_cols:
+            total = result_df[region].sum()
+            lines.append(f"  {region}: ${total:,.0f}")
 
     return "\n".join(lines)
 

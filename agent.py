@@ -125,6 +125,14 @@ def process_question(question: str, df, summary: dict, is_dark_mode: bool = Fals
     tool_name = llm_routing["tool"]
     filters = llm_routing["filters"]
 
+    # ── Debug: show LLM routing decision ────────────────────
+    with st.expander("🔧 Debug: LLM Routing Decision", expanded=False):
+        st.write(f"**Tool selected:** `{tool_name}`")
+        if "_routing_override" in llm_routing:
+            st.warning(f"⚠️ Routing override: {llm_routing['_routing_override']}")
+        st.write("**Filters:**")
+        st.json({k: v for k, v in filters.items() if k != '_is_dark_mode'})
+
     # Store theme info in filters so router can pass it to tools
     filters["_is_dark_mode"] = is_dark_mode
 

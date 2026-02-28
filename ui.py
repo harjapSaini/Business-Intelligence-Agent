@@ -475,8 +475,16 @@ def render_chat_message(msg: dict, msg_idx: int = 0, is_dark: bool = False) -> N
 
     elif msg["role"] == "assistant":
         with st.chat_message("assistant", avatar="🏪"):
-            # Insight text
-            st.markdown(msg.get("insight", ""))
+            # Insight text — use st.html() to bypass Streamlit's markdown
+            # parser which misinterprets number/comma patterns as code spans
+            insight = msg.get("insight", "")
+            text_color = "#e0e0e0" if is_dark else "#1a1a1a"
+            if insight:
+                st.html(
+                    f"<p style='font-size: 16px; line-height: 1.6; "
+                    f"color: {text_color}; margin: 0 0 12px 0;'>"
+                    f"{insight}</p>"
+                )
 
             # Tool badge
             tool = msg.get("tool", "")
