@@ -161,8 +161,7 @@ Session memory (context from prior questions):
 IMPORTANT RULES:
 - If the user references "that region", "the top brand", "it", etc., resolve from session memory above.
 - Always pick the MOST APPROPRIATE tool. When in doubt, use yoy_comparison.
-- The "insight" should be 2-3 sentences of business analysis about what the result likely shows.
-- The "suggestions" should be 3 natural follow-up questions a business analyst would ask next.
+- Your ONLY job is to pick the tool and filters. Do NOT generate insights.
 
 You MUST respond with ONLY a valid JSON object in this EXACT format, nothing else:
 {{{{
@@ -175,13 +174,7 @@ You MUST respond with ONLY a valid JSON object in this EXACT format, nothing els
     "brand": null,
     "group_by": null,
     "group_value": null
-  }}}},
-  "insight": "Your 2-3 sentence business insight here.",
-  "suggestions": [
-    "Follow-up question 1",
-    "Follow-up question 2",
-    "Follow-up question 3"
-  ]
+  }}}}
 }}}}
 
 Do NOT include any text, explanation, or markdown outside the JSON object.
@@ -250,13 +243,11 @@ def extract_json_from_response(raw_text: str) -> dict:
 
 def validate_llm_response(parsed: dict) -> dict:
     """
-    Validate and fix a parsed LLM JSON response.
+    Validate and fix a parsed LLM JSON response (Pass 1 - routing only).
 
     Ensures:
     - 'tool' is one of the valid tool names
     - 'filters' exists and has safe defaults
-    - 'insight' is a non-empty string
-    - 'suggestions' is a list of 3 strings
 
     Args:
         parsed: Dict from JSON parsing.
@@ -277,6 +268,25 @@ def validate_llm_response(parsed: dict) -> dict:
     # Ensure metric has a default
     if not result["filters"].get("metric"):
         result["filters"]["metric"] = "sales"
+
+    return result
+
+
+def validate_insight_response(parsed: dict) -> dict:
+    """
+    Validate and fix a parsed LLM JSON response (Pass 2 - insight generation).
+
+    Ensures:
+    - 'insight' is a non-empty string
+    - 'suggestions' is a list of 3 strings
+
+    Args:
+        parsed: Dict from JSON parsing.
+
+    Returns:
+        dict - validated/corrected response.
+    """
+    result = dict(parsed)
 
     # Ensure insight is a string
     if not isinstance(result.get("insight"), str) or not result["insight"].strip():
@@ -299,16 +309,15 @@ def validate_llm_response(parsed: dict) -> dict:
 
 
 # =====================================================================
-#  ASK LLM (SINGLE CALL)
+#  PASS 1: ASK LLM (TOOL ROUTING)
 # =====================================================================
 
 def ask_llm(question: str, session_memory: dict, df_summary: dict) -> dict:
     """
-    Send a user question to Ollama and get back a structured JSON response.
+    Pass 1: Send a user question to Ollama to pick the right tool + filters.
 
-    Makes exactly ONE LLM call. Parses the response JSON, validates it,
-    and returns the structured result. Falls back gracefully if the LLM
-    returns malformed output.
+    Makes exactly ONE LLM call. Returns only tool routing info.
+    The actual insight is generated in Pass 2 after the tool runs.
 
     Args:
         question:       The user's natural-language question.
@@ -316,7 +325,7 @@ def ask_llm(question: str, session_memory: dict, df_summary: dict) -> dict:
         df_summary:     Dataset summary from get_dataset_summary().
 
     Returns:
-        dict with keys: 'tool', 'filters', 'insight', 'suggestions'
+        dict with keys: 'tool', 'filters'
     """
     system_prompt = build_system_prompt(df_summary, session_memory)
 
@@ -342,30 +351,113 @@ def ask_llm(question: str, session_memory: dict, df_summary: dict) -> dict:
         return {
             "tool": "yoy_comparison",
             "filters": {"metric": "sales"},
-            "insight": (
-                "I had trouble parsing the analysis request. "
-                "Showing a default year-over-year sales comparison instead. "
-                "Try rephrasing your question for better results."
-            ),
-            "suggestions": [
-                "Which division grew the most year over year?",
-                "Show me margin rate by region",
-                "Are there any anomalies in the data?",
-            ],
         }
     except Exception as e:
         # Ollama connection or other error - return error fallback
         return {
             "tool": "yoy_comparison",
             "filters": {"metric": "sales"},
+            "_error": str(e),
+        }
+
+
+# =====================================================================
+#  PASS 2: GENERATE DATA-DRIVEN INSIGHT
+# =====================================================================
+
+def build_insight_prompt(question: str, tool_name: str, data_summary: str) -> str:
+    """
+    Build the system prompt for the second LLM call.
+
+    This prompt gives the LLM the actual data results and asks it to
+    write a specific, number-backed business insight.
+
+    Args:
+        question:     The user's original question.
+        tool_name:    The tool that was used.
+        data_summary: Compact text summary of the tool's output.
+
+    Returns:
+        str - the system prompt for Pass 2.
+    """
+    return f"""You are a senior Business Intelligence analyst at Canadian Tire.
+You have just run the "{tool_name.replace('_', ' ')}" analysis tool and received real data results.
+
+Here are the ACTUAL DATA RESULTS from the analysis:
+---
+{data_summary}
+---
+
+Based on these real numbers, write a business insight and suggest follow-up questions.
+
+RULES FOR YOUR INSIGHT:
+- Reference SPECIFIC numbers, percentages, and entity names from the data above.
+- Explain what the numbers MEAN for the business (e.g. "Sports grew 15.5% YoY, outpacing all other divisions, likely driven by seasonal demand.").
+- Include business reasoning: WHY might these patterns exist? What should a business leader do about it?
+- If there are notable outliers or surprises in the data, call them out.
+- Write 3-5 sentences. Be specific and analytical, not vague.
+- Do NOT say "likely shows" or "may indicate" - you have the real data, so state facts.
+
+RULES FOR SUGGESTIONS:
+- Suggest 3 follow-up questions that reference specific entities from the data.
+- Each question should help the user dig deeper into interesting findings.
+
+You MUST respond with ONLY a valid JSON object in this EXACT format:
+{{{{
+  "insight": "Your 3-5 sentence data-driven business insight here.",
+  "suggestions": [
+    "Follow-up question 1",
+    "Follow-up question 2",
+    "Follow-up question 3"
+  ]
+}}}}
+
+Do NOT include any text outside the JSON object.
+Respond with ONLY the JSON object."""
+
+
+def generate_insight(
+    question: str,
+    tool_name: str,
+    data_summary: str,
+) -> dict:
+    """
+    Pass 2: Generate a data-driven insight using the actual tool results.
+
+    Args:
+        question:     The user's original question.
+        tool_name:    The tool that produced the results.
+        data_summary: Compact text summary of the tool's DataFrame output.
+
+    Returns:
+        dict with keys: 'insight', 'suggestions'
+    """
+    system_prompt = build_insight_prompt(question, tool_name, data_summary)
+
+    try:
+        response = ollama.chat(
+            model=OLLAMA_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": question},
+            ],
+            options={"temperature": 0.3},  # Slightly higher for natural writing
+        )
+
+        raw_text = response["message"]["content"]
+        parsed = extract_json_from_response(raw_text)
+        validated = validate_insight_response(parsed)
+        return validated
+
+    except Exception:
+        # If Pass 2 fails, use the data summary directly as the insight
+        return {
             "insight": (
-                f"An error occurred while processing your question: {str(e)}. "
-                "Showing a default year-over-year sales comparison. "
-                "Make sure Ollama is running with the llama3.2:3b model."
+                f"Here are the key findings from the analysis:\n\n{data_summary}"
             ),
             "suggestions": [
-                "Which division grew the most year over year?",
-                "Show me the top brands by sales",
-                "Project Apparel sales into 2025",
+                "Show me the overall sales trend",
+                "Which division performs best?",
+                "Are there any anomalies in the data?",
             ],
         }

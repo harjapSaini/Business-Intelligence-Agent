@@ -2,15 +2,17 @@
 
 ## Test Summary
 
-All 5 phases have been verified with a total of **146/146 tests passing**.
+All 7 phases have been verified for mathematical accuracy, UI robustness, and LLM reliability.
 
-| Phase                     | Tests | Result |
-| ------------------------- | ----- | ------ |
-| Phase 1 - Foundation      | 20/20 | ✅     |
-| Phase 2 - Analysis Tools  | 22/22 | ✅     |
-| Phase 3 - LLM Integration | 47/47 | ✅     |
-| Phase 4 - Session Memory  | 27/27 | ✅     |
-| Phase 5 - UI Polish       | 30/30 | ✅     |
+| Phase                     | Tests / Verification | Result |
+| ------------------------- | -------------------- | ------ |
+| Phase 1 - Foundation      | 20/20                | ✅     |
+| Phase 2 - Analysis Tools  | 22/22                | ✅     |
+| Phase 3 - LLM Integration | 47/47                | ✅     |
+| Phase 4 - Session Memory  | 27/27                | ✅     |
+| Phase 5 - UI Polish       | 30/30                | ✅     |
+| Phase 6 - Dark / Light UI | Browser Subagent     | ✅     |
+| Phase 7 - Two-Pass LLM    | Browser Subagent     | ✅     |
 
 ## Phase 1 Tests
 
@@ -62,6 +64,21 @@ All 5 phases have been verified with a total of **146/146 tests passing**.
 - UI module exports: inject_custom_css, render_welcome, render_chat_message, render_suggestions
 - Welcome screen has 5 example questions
 - Custom CSS has: Inter font import, button hover, tool-badge class, sidebar gradient, Canadian Tire red
+
+## Phase 6 Tests
+
+- Custom CSS blocks explicitly define Light and Dark mode variables.
+- Streamlit Base theme logic overridden in `.streamlit/config.toml` to prevent OS-level bleeding.
+- Dark mode toggle in sidebar switches `st.session_state.dark_mode`.
+- Plotly templates dynamically swap between `plotly_white` and `plotly_dark`.
+- Text contrast passes legibility tests in both modes.
+
+## Phase 7 Tests
+
+- Tool outputs successfully serialized into compact string summaries via `insight_builder.py`.
+- LLM Router reliably fires immediately on prompt submission (Pass 1).
+- Execution sequence verified: LLM Router -> Tool Processing -> Data Summarization -> LLM Insight (Pass 2).
+- LLM narrations explicitly quote numbers, brands, and percentages from the tool output, eliminating generic hallucinations.
 
 ## Running Tests
 

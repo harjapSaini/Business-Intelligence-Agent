@@ -1,90 +1,25 @@
-# Capabilities & Limitations
+# Agent Capabilities & Limitations
 
-## Capabilities
+The Private Business Intelligence Agent is a powerful local analysis tool, but it operates under specific architectural constraints.
 
-### What the Agent Can Do
+## Technical Capabilities
 
-| Capability                   | Description                                                                               |
-| ---------------------------- | ----------------------------------------------------------------------------------------- |
-| **Natural-language queries** | Ask questions in plain English - the AI picks the right tool                              |
-| **5 analysis tools**         | YoY comparison, brand×region heatmap, forecasting, anomaly detection, price-volume-margin |
-| **Interactive charts**       | Plotly charts with hover, zoom, and pan                                                   |
-| **Follow-up conversations**  | Session memory tracks context for multi-turn conversations                                |
-| **Suggestion buttons**       | 3 AI-generated follow-up questions after each response                                    |
-| **Data tables**              | View raw numbers behind every chart                                                       |
-| **Multiple filters**         | Filter by region, division, brand, category, year, and metric                             |
-| **Anomaly callouts**         | Plain-English descriptions of statistical outliers                                        |
-| **12-month forecasts**       | Linear regression projections with confidence bands                                       |
-| **100% local**               | All data and AI processing stays on your machine                                          |
+1. **Absolute Privacy:** The architecture explicitly prevents data exfiltration. The target CSV file never leaves your device. The LLM engine (Ollama) runs inside a local daemon process on your hardware.
+2. **Intelligent Routing:** The agent translates natural language into 1 of 5 explicit mathematical Python paradigms via zero-shot JSON extraction, eliminating hallucinations in mathematical logic.
+3. **Multi-Turn Contextual Memory:** The agent successfully retains filter matrices (Region, Brand, Category, Division) across conversational turns until explicitly overwritten or cleared.
+4. **Adaptive Insight Generation:** Through its Two-Pass Architecture, textual insights are written by the LLM only _after_ observing a highly compressed representation of actual DataFrame results, guaranteeing narrative accuracy correlated to the math.
+5. **Theme-Aware Data Visualizations:** All Plotly charts and Pandas structures inherit explicitly declared light/dark cascading style sheets to guarantee contrast compliance visually.
 
-### Supported Metrics
+## Known Limitations
 
-| Metric        | Description             |
-| ------------- | ----------------------- |
-| `sales`       | Revenue (price × units) |
-| `units`       | Units sold              |
-| `margin`      | Profit (sales − COGS)   |
-| `margin_rate` | Profit as % of sales    |
-| `cogs`        | Cost of goods sold      |
-
-### Supported Filters
-
-| Filter   | Values                                                                 |
-| -------- | ---------------------------------------------------------------------- |
-| Region   | East, North, South, West                                               |
-| Division | Apparel, Food, Gardening, Sports, Tools                                |
-| Brand    | Dexon, Fynix, Kryta, Lumix, Novex, Quanta, Solvo, Trion, Vetra, Zentra |
-| Category | 12 categories across divisions                                         |
-| Year     | 2023, 2024                                                             |
-
----
-
-## Limitations
-
-### Model Limitations
-
-| Limitation                 | Detail                                                                        |
-| -------------------------- | ----------------------------------------------------------------------------- |
-| **Response time**          | Each question takes 15–50 seconds (depends on hardware and model cache state) |
-| **First query slower**     | ~50s on first query due to model loading; ~20s thereafter                     |
-| **3B parameter model**     | May occasionally misinterpret complex or ambiguous questions                  |
-| **English only**           | The system prompt and model are optimised for English                         |
-| **No image understanding** | Cannot analyse uploaded images or screenshots                                 |
-
-### Data Limitations
-
-| Limitation            | Detail                                                                     |
-| --------------------- | -------------------------------------------------------------------------- |
-| **Static dataset**    | Uses a fixed Excel file; cannot connect to live databases                  |
-| **2 years only**      | Data covers 2023–2024; limited historical depth for forecasting            |
-| **Linear forecasts**  | Uses simple linear regression - does not account for seasonality or trends |
-| **Z-score anomalies** | Assumes roughly normal distribution; may miss non-Gaussian outliers        |
-
-### Tool Limitations
-
-| Limitation         | Detail                                                                                    |
-| ------------------ | ----------------------------------------------------------------------------------------- |
-| **5 tools only**   | Cannot perform analyses outside the 5 built-in tools                                      |
-| **No custom SQL**  | Cannot run arbitrary queries against the data                                             |
-| **No export**      | Charts and tables cannot be downloaded directly (use Plotly's built-in screenshot button) |
-| **Single dataset** | Cannot compare across multiple datasets                                                   |
-
-### Session Limitations
-
-| Limitation            | Detail                                                                           |
-| --------------------- | -------------------------------------------------------------------------------- |
-| **No persistence**    | Conversation is lost when the browser tab is closed                              |
-| **Memory is shallow** | Tracks entities and last result only - not full conversation history for the LLM |
-| **No authentication** | No user login or access control                                                  |
-
----
-
-## Accuracy
-
-The LLM chooses the correct tool approximately **90–95% of the time** for straightforward questions. Accuracy may drop for:
-
-- Very vague questions ("Tell me something interesting")
-- Questions requiring tools not in the toolkit
-- Questions mixing multiple analysis types in one query
-
-When the LLM picks the wrong tool, the fallback mechanisms ensure you still get a valid chart - just not the one you expected. Try rephrasing or being more specific.
+1. **Pre-defined Analytics Tooling:** The agent cannot write arbitrary Python code on the fly to answer completely novel queries. It must map your question to one of the 5 predefined tools:
+   - YoY Comparison
+   - Brand x Region Crosstabulation
+   - Single-Entity Multi-Year Forecasting
+   - Macro Anomaly Detection
+   - Price vs Volume vs Margin Clustering
+     If a question falls totally outside these bounds, it will attempt to default to a basic YoY comparison.
+2. **Model Token Limits:** The default `llama3.2:3b` model is highly capable but operates on constrained hardware. Excessively long or hyper-complex queries might crash the prompt structure or result in a timeout/failure to generate valid JSON.
+3. **Data Dependency:** The agent expects the input data structure (`data/mock_retail_data.csv`) to follow a specific schema with designated columns (`Region`, `Division`, `Category`, `Brand`, `Sales`, `Margin`, `Volume`, `Year`). Swapping the dataset for an entirely different schema will require codebase refactoring.
+4. **LLM Insight Latency:** Because of the Two-Pass Architecture, processing a complex question requires two distinct sequential inferences from Ollama (Routing + Narration), meaning response times directly scale with local GPU/CPU hardware capabilities.
+5. **Statistical Naivety in Forecasting:** The forecasting tool utilizes a simplistic linear regression slope calculated between 2023 and 2024. It does not account for seasonality, macro-economic factors, or complex time-series ARIMAs.

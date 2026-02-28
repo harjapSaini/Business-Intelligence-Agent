@@ -12,8 +12,9 @@ import streamlit as st
 
 from config import DATA_PATH
 from data_loader import load_data, get_dataset_summary
-from ollama_client import verify_ollama, warmup_model, ask_llm
+from ollama_client import verify_ollama, warmup_model, ask_llm, generate_insight
 from tools import tool_router
+from insight_builder import build_data_summary
 from ui import (
     inject_custom_css,
     render_sidebar,
@@ -57,7 +58,7 @@ def init_session_state() -> None:
 #  MEMORY UPDATE
 # =====================================================================
 
-def update_memory(llm_response: dict, result_df=None) -> None:
+def update_memory(tool_name: str, filters: dict, insight: str, result_df=None) -> None:
     """
     Update session memory with entities and context from the latest
     LLM response and tool result.
@@ -68,7 +69,6 @@ def update_memory(llm_response: dict, result_df=None) -> None:
     mem = st.session_state.session_memory
 
     # Update entities from filters (only non-None values)
-    filters = llm_response.get("filters", {})
     entity_keys = ["region", "brand", "division", "category"]
     for key in entity_keys:
         val = filters.get(key)
@@ -76,14 +76,14 @@ def update_memory(llm_response: dict, result_df=None) -> None:
             mem["entities"][key] = val
 
     # Store last filters (include tool name)
-    mem["last_filters"] = {"tool": llm_response.get("tool", "")}
+    mem["last_filters"] = {"tool": tool_name}
     for k, v in filters.items():
         if v and str(v).lower() not in ("null", "none", ""):
             mem["last_filters"][k] = v
 
     # Store last result description
     mem["last_result"] = {
-        "description": llm_response.get("insight", "")[:200],
+        "description": insight[:200],
     }
 
     # Try to extract the top item from the result dataframe
@@ -96,12 +96,15 @@ def update_memory(llm_response: dict, result_df=None) -> None:
 
 
 # =====================================================================
-#  PROCESS A QUESTION
+#  PROCESS A QUESTION (TWO-PASS LLM PIPELINE)
 # =====================================================================
 
 def process_question(question: str, df, summary: dict, is_dark_mode: bool = False) -> None:
     """
-    Full pipeline: LLM call → tool routing → memory update → store message.
+    Full pipeline:
+      Pass 1: LLM picks tool + filters
+      Tool runs: generates chart + data
+      Pass 2: LLM writes data-driven insight from actual results
 
     Args:
         question: The user's natural-language question.
@@ -112,31 +115,38 @@ def process_question(question: str, df, summary: dict, is_dark_mode: bool = Fals
     # Add user message
     st.session_state.messages.append({"role": "user", "content": question})
 
-    # Call LLM
-    llm_response = ask_llm(
+    # ── Pass 1: Pick the right tool + filters ───────────────
+    llm_routing = ask_llm(
         question,
         st.session_state.session_memory,
         summary,
     )
 
-    # Route to the correct tool
-    tool_name = llm_response["tool"]
-    filters = llm_response["filters"]
-    
+    tool_name = llm_routing["tool"]
+    filters = llm_routing["filters"]
+
     # Store theme info in filters so router can pass it to tools
     filters["_is_dark_mode"] = is_dark_mode
-    
+
+    # ── Run the tool ────────────────────────────────────────
     fig, result_df, callouts = tool_router(tool_name, filters, df)
 
-    # Update session memory
-    update_memory(llm_response, result_df)
+    # ── Build compact data summary for Pass 2 ──────────────
+    metric = filters.get("metric", "sales")
+    data_summary = build_data_summary(tool_name, result_df, callouts, metric)
+
+    # ── Pass 2: Generate data-driven insight ────────────────
+    insight_response = generate_insight(question, tool_name, data_summary)
+
+    # ── Update session memory ───────────────────────────────
+    update_memory(tool_name, filters, insight_response["insight"], result_df)
 
     # Build assistant message
     assistant_msg = {
         "role": "assistant",
         "tool": tool_name,
-        "insight": llm_response["insight"],
-        "suggestions": llm_response["suggestions"],
+        "insight": insight_response["insight"],
+        "suggestions": insight_response["suggestions"],
         "figure": fig,
         "summary_df": result_df,
         "callouts": callouts,

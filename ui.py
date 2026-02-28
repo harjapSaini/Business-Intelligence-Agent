@@ -42,21 +42,47 @@ CUSTOM_CSS_LIGHT = """
 <style>
 """ + COMMON_CSS + """
 /* ── LIGHT MODE STYLES ────────────────────────────────────── */
+/* Force absolute light background */
+.stApp {
+    background-color: #FFFFFF !important;
+}
+[data-testid="stAppViewBlockContainer"] {
+    background-color: #FFFFFF !important;
+    padding-bottom: 2rem;
+}
+header[data-testid="stHeader"] {
+    background-color: transparent !important;
+}
+
+/* Force text colors to dark */
+.stMarkdown p, .stMarkdown li, h1, h2, h3, h4, h5, h6 {
+    color: #263238 !important;
+}
+.stMetric label {
+    color: #78909C !important;
+}
+.stMetric [data-testid="stMetricValue"] {
+    color: #263238 !important;
+}
+
 .stButton > button {
     border-radius: 8px;
-    border: 1px solid #e0e0e0;
+    border: 1px solid #e0e0e0 !important;
     font-size: 0.85rem;
     padding: 0.5rem 1rem;
     transition: all 0.2s ease;
-    background: white;
-    color: #333;
+    background: #FFFFFF !important;
+    color: #263238 !important;
 }
 .stButton > button:hover {
-    border-color: #D32F2F;
-    color: #D32F2F;
-    background: #fff5f5;
+    border-color: #D32F2F !important;
+    color: #D32F2F !important;
+    background: #fff5f5 !important;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(211,47,47,0.15);
+}
+.stButton > button p {
+    color: inherit !important;
 }
 
 .tool-badge {
@@ -70,14 +96,11 @@ CUSTOM_CSS_LIGHT = """
 }
 
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #fafbfc 0%, #f0f4f8 100%);
+    background: linear-gradient(180deg, #fafbfc 0%, #edf1f5 100%) !important;
 }
-section[data-testid="stSidebar"] .stMetric label {
-    font-size: 0.75rem;
-    color: #78909c;
+section[data-testid="stSidebar"] p {
+    color: #263238 !important;
 }
-
-/* Default streamlit metric and text colors are fine for light mode */
 
 .welcome-card {
     background: linear-gradient(135deg, #fafbfc 0%, #e8f5e9 50%, #fff3e0 100%);
@@ -88,10 +111,10 @@ section[data-testid="stSidebar"] .stMetric label {
 }
 .welcome-card h2 {
     margin-top: 0;
-    color: #263238;
+    color: #263238 !important;
 }
 .welcome-card-desc {
-    color: #546e7a;
+    color: #546e7a !important;
     font-size: 1.05rem;
 }
 .welcome-card .example-q {
@@ -109,8 +132,51 @@ section[data-testid="stSidebar"] .stMetric label {
     background: #fff5f5;
     border-left-color: #1976D2;
 }
+
+/* ── Chat input styling (Light) ── */
+[data-testid="stBottomBlockContainer"] {
+    background-color: #FFFFFF !important;
+}
+.stChatInput {
+    background-color: transparent !important;
+}
+[data-testid="stChatInput"] > div {
+    background-color: #FAFAFA !important;
+    border: 1px solid #E0E0E0 !important;
+}
+[data-testid="stChatInput"] textarea {
+    color: #263238 !important;
+    background-color: #FAFAFA !important;
+}
+[data-testid="stChatInput"] textarea::placeholder {
+    color: #78909C !important;
+}
+[data-testid="stChatInputSubmitButton"] {
+    background-color: transparent !important;
+}
+[data-testid="stChatInputSubmitButton"] svg {
+    fill: #D32F2F !important;
+}
+
+/* ── Expander & DataFrame (Light) ── */
 .streamlit-expanderHeader {
-    color: #546e7a;
+    color: #546e7a !important;
+    background-color: #FAFAFA !important;
+    border-radius: 8px;
+}
+div[data-testid="stExpander"] div[role="button"] p {
+    color: #546e7a !important;
+}
+[data-testid="stDataFrame"] {
+    background-color: #FFFFFF !important;
+}
+[data-testid="stDataFrame"] div, [data-testid="stDataFrame"] span {
+    color: #263238 !important;
+    background-color: transparent !important;
+}
+[data-testid="stDataFrame"] th {
+    background-color: #F8F9FA !important;
+    color: #263238 !important;
 }
 </style>
 """
@@ -121,33 +187,45 @@ CUSTOM_CSS_DARK = """
 /* ── DARK MODE STYLES ─────────────────────────────────────── */
 /* Force absolute dark background */
 .stApp {
-    background: #0E1117;
+    background-color: #0E1117 !important;
+}
+[data-testid="stAppViewBlockContainer"] {
+    background-color: #0E1117 !important;
+    padding-bottom: 2rem;
+}
+header[data-testid="stHeader"] {
+    background-color: transparent !important;
 }
 
 /* Force text colors to soft white */
-.stMarkdown p, .stMarkdown li, .stMetric label, h1, h2, h3, h4, h5, h6 {
+.stMarkdown p, .stMarkdown li, h1, h2, h3, h4, h5, h6 {
+    color: #FAFAFA !important;
+}
+.stMetric label {
+    color: #B0BEC5 !important;
+}
+.stMetric [data-testid="stMetricValue"] {
     color: #FAFAFA !important;
 }
 
 .stButton > button {
     border-radius: 8px;
-    border: 1px solid #37474F;
+    border: 1px solid #37474F !important;
     font-size: 0.85rem;
     padding: 0.5rem 1rem;
     transition: all 0.2s ease;
-    background: #262730;
-    color: #FAFAFA;
+    background: #262730 !important;
+    color: #FAFAFA !important;
 }
 .stButton > button:hover {
-    border-color: #D32F2F;
-    color: #FAFAFA;
-    background: #3c2424;
+    border-color: #D32F2F !important;
+    color: #FAFAFA !important;
+    background: #3c2424 !important;
     transform: translateY(-1px);
     box-shadow: 0 2px 8px rgba(211,47,47,0.3);
 }
-
 .stButton > button p {
-    color: #FAFAFA !important;
+    color: inherit !important;
 }
 
 .tool-badge {
@@ -162,11 +240,10 @@ CUSTOM_CSS_DARK = """
 }
 
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #1A1C23 0%, #101216 100%);
+    background: linear-gradient(180deg, #1A1C23 0%, #101216 100%) !important;
 }
-section[data-testid="stSidebar"] .stMetric label {
-    font-size: 0.75rem;
-    color: #B0BEC5 !important;
+section[data-testid="stSidebar"] p {
+    color: #FAFAFA !important;
 }
 
 .welcome-card {
@@ -178,10 +255,10 @@ section[data-testid="stSidebar"] .stMetric label {
 }
 .welcome-card h2 {
     margin-top: 0;
-    color: #FAFAFA;
+    color: #FAFAFA !important;
 }
 .welcome-card-desc {
-    color: #B0BEC5;
+    color: #B0BEC5 !important;
     font-size: 1.05rem;
 }
 .welcome-card .example-q {
@@ -195,42 +272,43 @@ section[data-testid="stSidebar"] .stMetric label {
     cursor: default;
     transition: all 0.15s ease;
 }
-/* ── Override Streamlit default app background ── */
-.stApp {
-    background: #0E1117;
-}
-[data-testid="stAppViewBlockContainer"] {
-    background-color: #0E1117;
-    padding-bottom: 2rem;
-}
-header[data-testid="stHeader"] {
-    background-color: transparent !important;
-}
 
-/* ── Chat input styling ── */
+/* ── Chat input styling (Dark) ── */
 [data-testid="stBottomBlockContainer"] {
     background-color: #0E1117 !important;
 }
 .stChatInput {
-    background-color: #1A1C23 !important;
-    border-color: #37474F !important;
+    background-color: transparent !important;
 }
-.stChatInput textarea {
+[data-testid="stChatInput"] > div {
+    background-color: #1A1C23 !important;
+    border: 1px solid #37474F !important;
+}
+[data-testid="stChatInput"] textarea {
     color: #FAFAFA !important;
     background-color: #1A1C23 !important;
 }
+[data-testid="stChatInput"] textarea::placeholder {
+    color: #B0BEC5 !important;
+}
+[data-testid="stChatInputSubmitButton"] {
+    background-color: transparent !important;
+}
+[data-testid="stChatInputSubmitButton"] svg {
+    fill: #FAFAFA !important;
+}
 
-/* ── Expander & DataFrame ── */
+/* ── Expander & DataFrame (Dark) ── */
 .streamlit-expanderHeader {
-    color: #B0BEC5;
-    background-color: #1E1E1E;
+    color: #B0BEC5 !important;
+    background-color: #1E1E1E !important;
     border-radius: 8px;
 }
 div[data-testid="stExpander"] div[role="button"] p {
     color: #B0BEC5 !important;
 }
 [data-testid="stDataFrame"] {
-    background-color: #1A1C23;
+    background-color: #1A1C23 !important;
 }
 [data-testid="stDataFrame"] div, [data-testid="stDataFrame"] span {
     color: #B0BEC5 !important;

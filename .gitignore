@@ -18,7 +18,8 @@ build/
 Thumbs.db
 
 # Streamlit
-.streamlit/
+.streamlit/*
+!.streamlit/config.toml
 
 # Temp files
 *.tmp

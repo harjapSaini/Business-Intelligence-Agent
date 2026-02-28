@@ -16,52 +16,67 @@
           ▼       ▼       ▼       ▼       ▼
      config   data_    ollama_   ui    tools/
       .py    loader    client   .py   package
-              .py       .py
+              .py       .py               │
+                                          ▼
+                                     insight_
+                                     builder.py
 ```
 
 ## Module Responsibilities
 
-| Module             | Lines | Responsibility                                                      |
-| ------------------ | ----- | ------------------------------------------------------------------- |
-| `agent.py`         | ~210  | Page config, session state, chat loop, memory updates               |
-| `config.py`        | ~55   | Constants: URLs, model, paths, tool names, colour palette           |
-| `data_loader.py`   | ~63   | Load Excel, compute KPIs, build dataset summary                     |
-| `ollama_client.py` | ~310  | LLM prompt building, API calls, JSON parsing, validation            |
-| `ui.py`            | ~260  | CSS injection, sidebar, welcome screen, chat rendering, suggestions |
-| `tools/`           | ~530  | 5 analysis functions + tool router dispatcher                       |
+| Module               | Responsibility                                               |
+| -------------------- | ------------------------------------------------------------ |
+| `agent.py`           | Page config, session state, chat loop, 2-pass orchestration  |
+| `config.py`          | Constants: URLs, model, paths, tool names, colour palette    |
+| `data_loader.py`     | Load Excel/CSV, compute KPIs, build dataset summary          |
+| `ollama_client.py`   | Pass 1 (Router Prompt), Pass 2 (Insight Prompt), API calls   |
+| `insight_builder.py` | Summarizes raw DataFrame outputs into dense text for the LLM |
+| `ui.py`              | CSS injection, dark mode toggle, sidebars, components        |
+| `tools/`             | 5 analysis functions + tool router dispatcher                |
 
-## Data Flow
+## Data Flow (Two-Pass LLM Architecture)
 
 ```
 User Question
     │
     ▼
-┌────────────┐     ┌─────────────────┐
-│  agent.py  │────▶│ ollama_client   │
-│ (chat loop)│     │  ask_llm()      │
-└─────┬──────┘     └───────┬─────────┘
-      │                    │
-      │              Ollama API
-      │              (localhost:11434)
-      │                    │
-      │              JSON response
-      │              {tool, filters,
-      │               insight, suggestions}
-      │                    │
-      ▼                    ▼
-┌────────────┐     ┌─────────────────┐
-│   tools/   │◀────│  tool_router()  │
-│ (5 tools)  │     └─────────────────┘
-└─────┬──────┘
-      │
-      ▼
-  (fig, df, callouts)
-      │
-      ▼
-┌────────────┐
-│   ui.py    │
-│ (render)   │
-└────────────┘
+┌──────────────────┐
+│     agent.py     │
+│  (chat loop)     │
+└────────┬─────────┘
+         │
+         ▼
+[PASS 1: ROUTING] ───────────────▶ Ollama API (localhost:11434)
+         │                              │
+         │                              ▼
+         │                        {tool, filters}
+         ▼
+┌──────────────────┐
+│  tool_router()   │
+│   (in tools/)    │
+└────────┬─────────┘
+         │
+         ▼
+  Returns: fig, df
+         │
+         ▼
+┌──────────────────┐
+│insight_builder.py│
+│  (summarize_*)   │
+└────────┬─────────┘
+         │
+         ▼
+[PASS 2: INSIGHT] ───────────────▶ Ollama API (localhost:11434)
+         │                              │
+         │                              ▼
+         │                     Narrative insight &
+         │                     Follow-up questions
+         ▼
+┌──────────────────┐
+│      ui.py       │
+│  (Render charts  │
+│    and text)     │
+└──────────────────┘
 ```
 
 ## Key Design Decisions
