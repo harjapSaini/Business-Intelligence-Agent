@@ -20,6 +20,14 @@ VALID_TOOLS = [
     "forecast_trendline",
     "anomaly_detection",
     "price_volume_margin",
+    "store_performance",
+    "seasonality_trends",
+    "division_mix",
+    "margin_waterfall",
+    "kpi_scorecard",
+    "price_elasticity",
+    "brand_benchmarking",
+    "growth_margin_matrix",
 ]
 
 # ── Chart colour palette (consistent across all tools) ────────
@@ -50,3 +58,17 @@ FORECAST_CONFIDENCE = "rgba(211,47,47,0.12)"
 
 # Heatmap colour scale
 HEATMAP_SCALE = "RdYlGn"
+
+# Waterfall colours (margin_waterfall tool)
+WATERFALL_COLORS = {"increase": "#2E7D32", "decrease": "#D32F2F", "total": "#1976D2"}
+
+# RAG status colours (kpi_scorecard tool)
+RAG_COLORS = {"green": "#2E7D32", "yellow": "#FBC02D", "red": "#D32F2F"}
+
+# BCG quadrant colours (growth_margin_matrix tool)
+QUADRANT_COLORS = {
+    "Stars": "#2E7D32",
+    "Cash Cows": "#1976D2",
+    "Question Marks": "#F57C00",
+    "Dogs": "#D32F2F",
+}

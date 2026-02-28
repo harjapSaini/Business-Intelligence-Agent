@@ -19,7 +19,7 @@ The Private Business Intelligence Agent is engineered from the ground up for str
 ### 3. Predictable Mathematical Sandboxing
 
 - **Elimination of "Code Execution" Risks:** Many AI agents attempt to write and execute arbitrary Python or SQL code on the fly to answer questions. This creates a massive attack surface for prompt injection (e.g., tricking the AI into writing a `DROP TABLE` command or reading shadow files).
-- **Hardcoded Tooling:** This agent _cannot_ execute arbitrary code. The LLM is strictly used as a router pointing to 1 of 5 pre-compiled, mathematically verified Python functions. Even if a user maliciously prompts the AI, the worst possible outcome is triggering the wrong, safe, read-only charting function.
+- **Hardcoded Tooling:** This agent _cannot_ execute arbitrary code. The LLM is strictly used as a router pointing to 1 of 13 pre-compiled, mathematically verified Python functions. Even if a user maliciously prompts the AI, the worst possible outcome is triggering the wrong, safe, read-only charting function.
 
 ### 4. Enterprise Compliance Suitability
 

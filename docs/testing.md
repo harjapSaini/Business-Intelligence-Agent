@@ -26,13 +26,21 @@ All 7 phases have been verified for mathematical accuracy, UI robustness, and LL
 
 ## Phase 2 Tests
 
-- All 5 tool functions return (figure, summary_df) or (figure, summary_df, callouts)
+- All 13 tool functions return (figure, summary_df) or (figure, summary_df, callouts)
 - Filters work: region, division, brand, category
 - YoY summary has Change % column
 - Forecast produces 12 forecast rows
 - Anomaly detection generates callout strings
 - PVM handles multi-filter (division + category)
-- Tool router dispatches all 5 tools correctly
+- Store performance returns top/bottom N stores with size trendline
+- Seasonality trends overlays 2023 vs 2024 by month and quarter
+- Division mix produces side-by-side donut charts with share shift
+- Margin waterfall decomposes YoY change into group-level deltas
+- KPI scorecard returns RAG-status table for all divisions (no filters)
+- Price elasticity computes arc elasticity and log-log regression per category
+- Brand benchmarking generates 100% stacked bar with margin overlay
+- Growth-margin matrix plots BCG-style 2×2 bubble chart with quadrant labels
+- Tool router dispatches all 13 tools correctly
 - Router handles unknown tools (fallback)
 - Router normalises `"None"` and `"null"` filter strings
 
@@ -59,8 +67,8 @@ All 7 phases have been verified for mathematical accuracy, UI robustness, and LL
 ## Phase 5 Tests
 
 - Config has CHART*COLORS (10), YOY_COLORS, ANOMALY_COLORS, FORECAST*\*, HEATMAP_SCALE
-- All 5 charts use correct config colours
-- All 5 charts use Inter font and title_font_size=18
+- All 13 charts use correct config colours (including WATERFALL_COLORS, RAG_COLORS, QUADRANT_COLORS)
+- All 13 charts use Inter font and title_font_size=18
 - UI module exports: inject_custom_css, render_welcome, render_chat_message, render_suggestions
 - Welcome screen has 5 example questions
 - Custom CSS has: Inter font import, button hover, tool-badge class, sidebar gradient, Canadian Tire red
@@ -75,7 +83,7 @@ All 7 phases have been verified for mathematical accuracy, UI robustness, and LL
 
 ## Phase 7 Tests
 
-- Tool outputs successfully serialized into compact string summaries via `insight_builder.py`.
+- All 13 tool outputs successfully serialized into compact string summaries via `insight_builder.py`.
 - LLM Router reliably fires immediately on prompt submission (Pass 1).
 - Execution sequence verified: LLM Router -> Tool Processing -> Data Summarization -> LLM Insight (Pass 2).
 - LLM narrations explicitly quote numbers, brands, and percentages from the tool output, eliminating generic hallucinations.

@@ -18,6 +18,10 @@ def forecast_trendline(
     group_by: str = "division",
     group_value: str = None,
     metric: str = "sales",
+    division: str = None,
+    region: str = None,
+    category: str = None,
+    brand: str = None,
     _is_dark_mode: bool = False,
 ) -> tuple:
     """
@@ -28,6 +32,10 @@ def forecast_trendline(
         group_by:    One of 'division', 'region', 'brand', 'category'.
         group_value: The specific value to filter on (e.g. 'Apparel').
         metric:      One of 'sales', 'margin', 'units', 'margin_rate'.
+        division:    Optional pre-filter for PRODUCT_DIVISION.
+        region:      Optional pre-filter for REGION.
+        category:    Optional pre-filter for PRODUCT_CATEGORY.
+        brand:       Optional pre-filter for BRAND.
 
     Returns:
         (plotly.Figure, pd.DataFrame) - trend chart + monthly data table.
@@ -48,8 +56,23 @@ def forecast_trendline(
     group_col = group_col_map.get(group_by, "PRODUCT_DIVISION")
     col = metric_col_map.get(metric, "SALES")
 
-    # Filter to the selected group
+    # Apply context pre-filters before grouping
     filtered = df.copy()
+    active_filters = []
+    if division:
+        filtered = filtered[filtered["PRODUCT_DIVISION"] == division]
+        active_filters.append(f"Div: {division}")
+    if region:
+        filtered = filtered[filtered["REGION"] == region]
+        active_filters.append(f"Reg: {region}")
+    if category:
+        filtered = filtered[filtered["PRODUCT_CATEGORY"] == category]
+        active_filters.append(f"Cat: {category}")
+    if brand:
+        filtered = filtered[filtered["BRAND"] == brand]
+        active_filters.append(f"Brand: {brand}")
+
+    # Then apply the group_value filter (existing logic)
     if group_value:
         filtered = filtered[filtered[group_col] == group_value]
 
@@ -109,7 +132,12 @@ def forecast_trendline(
 
     # Build chart
     metric_label = metric.replace("_", " ").title()
-    title_suffix = f" - {group_value}" if group_value else ""
+    # Add group_value to active_filters if present
+    if group_value:
+        active_filters.append(f"{group_by.title()}: {group_value}")
+    title_text = f"Forecast - {metric_label}"
+    if active_filters:
+        title_text += f" ({', '.join(active_filters)})"
     fig = go.Figure()
 
     # Historical line
@@ -136,7 +164,7 @@ def forecast_trendline(
     ))
 
     fig.update_layout(
-        title=f"Forecast - {metric_label}{title_suffix}",
+        title=title_text,
         xaxis_title="Date",
         yaxis_title=metric_label,
         template="plotly_dark" if _is_dark_mode else "plotly_white",

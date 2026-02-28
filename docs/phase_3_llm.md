@@ -15,7 +15,7 @@ Phase 3 transformed the application from a static dashboard into an AI-powered a
 ### 2. System Prompt Engineering
 
 - Crafted a strict, heavily guided `build_system_prompt()`.
-- The prompt explicitly lists the 5 available tools and their required parameters.
+- The prompt explicitly lists all 13 available tools and their required parameters.
 - It provides rules on how to interpret ambiguous user queries (e.g., mapping "West Coast" to "West").
 
 ### 3. Guaranteed JSON Extraction

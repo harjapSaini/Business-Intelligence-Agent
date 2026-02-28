@@ -16,6 +16,8 @@ def anomaly_detection(
     metric: str = "margin_rate",
     division: str = None,
     region: str = None,
+    category: str = None,
+    brand: str = None,
     _is_dark_mode: bool = False,
 ) -> tuple:
     """
@@ -26,6 +28,8 @@ def anomaly_detection(
         metric:   One of 'sales', 'margin', 'margin_rate'.
         division: Optional division filter.
         region:   Optional region filter.
+        category: Optional category filter.
+        brand:    Optional brand filter.
 
     Returns:
         (plotly.Figure, pd.DataFrame, list[str]) - scatter plot with
@@ -40,10 +44,19 @@ def anomaly_detection(
 
     # Apply filters
     filtered = df.copy()
+    active_filters = []
     if division:
         filtered = filtered[filtered["PRODUCT_DIVISION"] == division]
+        active_filters.append(f"Div: {division}")
     if region:
         filtered = filtered[filtered["REGION"] == region]
+        active_filters.append(f"Reg: {region}")
+    if category:
+        filtered = filtered[filtered["PRODUCT_CATEGORY"] == category]
+        active_filters.append(f"Cat: {category}")
+    if brand:
+        filtered = filtered[filtered["BRAND"] == brand]
+        active_filters.append(f"Brand: {brand}")
 
     # Product-level aggregation
     if metric == "margin_rate":
@@ -76,6 +89,10 @@ def anomaly_detection(
 
     # Build chart
     metric_label = metric.replace("_", " ").title()
+    title_text = f"Anomaly Detection - {metric_label}"
+    if active_filters:
+        title_text += f" ({', '.join(active_filters)})"
+        
     fig = px.scatter(
         product_agg,
         x="PRODUCT_NAME",
@@ -83,7 +100,7 @@ def anomaly_detection(
         color="label",
         color_discrete_map=ANOMALY_COLORS,
         hover_data=["PRODUCT_CATEGORY", "PRODUCT_DIVISION", "z_score"],
-        title=f"Anomaly Detection - {metric_label}",
+        title=title_text,
         labels={col: metric_label},
     )
     fig.update_layout(

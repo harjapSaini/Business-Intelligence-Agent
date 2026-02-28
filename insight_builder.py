@@ -265,6 +265,260 @@ def summarize_price_volume(result_df: pd.DataFrame) -> str:
     return "\n".join(lines)
 
 
+# =====================================================================
+#  SUMMARIZERS FOR NEW TOOLS (6–13)
+# =====================================================================
+
+def summarize_store_performance(result_df: pd.DataFrame, metric: str = "sales") -> str:
+    """Summarize store performance results."""
+    if result_df is None or result_df.empty:
+        return "No store performance data available."
+
+    metric_col_map = {
+        "sales": "SALES", "margin": "MARGIN",
+        "units": "UNITS_SOLD", "margin_rate": "MARGIN_RATE",
+    }
+    col = metric_col_map.get(metric, "SALES")
+
+    lines = []
+    lines.append(f"Total stores analyzed: {len(result_df)}")
+
+    if col in result_df.columns:
+        sorted_df = result_df.sort_values(col, ascending=False)
+        top = sorted_df.iloc[0]
+        bottom = sorted_df.iloc[-1]
+        lines.append(f"\nTop store: {top['STORE_NAME']} ({col}: {top[col]:,.0f}, size: {top['STORE_SIZE']})")
+        lines.append(f"Bottom store: {bottom['STORE_NAME']} ({col}: {bottom[col]:,.0f}, size: {bottom['STORE_SIZE']})")
+
+        # Correlation between store size and metric
+        if "STORE_SIZE" in result_df.columns:
+            numeric_size = pd.to_numeric(result_df["STORE_SIZE"], errors="coerce")
+            valid = result_df[numeric_size.notna()].copy()
+            if len(valid) >= 3:
+                corr = numeric_size[valid.index].corr(valid[col])
+                direction = "positive" if corr > 0.2 else ("negative" if corr < -0.2 else "weak/no")
+                lines.append(f"\nStore size vs {metric} correlation: {direction} (r={corr:.2f})")
+
+    lines.append(f"\nAll stores by {metric}:")
+    for _, row in result_df.head(10).iterrows():
+        lines.append(f"  - {row['STORE_NAME']}: {col}={row.get(col, 0):,.0f}, size={row['STORE_SIZE']}")
+
+    return "\n".join(lines)
+
+
+def summarize_seasonality(result_df: pd.DataFrame, metric: str = "sales") -> str:
+    """Summarize seasonality trends results."""
+    if result_df is None or result_df.empty:
+        return "No seasonality data available."
+
+    lines = []
+    time_col = result_df.columns[0]  # 'Month' or 'Quarter'
+    year_cols = [c for c in result_df.columns if c not in (time_col, "Change %")]
+
+    for yr in year_cols:
+        if yr in result_df.columns:
+            try:
+                peak_idx = result_df[yr].idxmax()
+                trough_idx = result_df[yr].idxmin()
+                peak_period = result_df.loc[peak_idx, time_col]
+                trough_period = result_df.loc[trough_idx, time_col]
+                lines.append(f"{yr} peak: {time_col} {peak_period} (${result_df.loc[peak_idx, yr]:,.0f})")
+                lines.append(f"{yr} trough: {time_col} {trough_period} (${result_df.loc[trough_idx, yr]:,.0f})")
+            except (ValueError, TypeError):
+                pass
+
+    if "Change %" in result_df.columns:
+        lines.append(f"\nYoY change by {time_col.lower()}:")
+        for _, row in result_df.iterrows():
+            lines.append(f"  - {time_col} {row[time_col]}: {row['Change %']:+.1f}%")
+
+    return "\n".join(lines)
+
+
+def summarize_division_mix(result_df: pd.DataFrame, metric: str = "sales") -> str:
+    """Summarize division mix results."""
+    if result_df is None or result_df.empty:
+        return "No division mix data available."
+
+    lines = []
+    share_cols = [c for c in result_df.columns if "Share%" in c]
+    value_cols = [c for c in result_df.columns if "Value" in c]
+
+    lines.append("Division revenue mix:")
+    for _, row in result_df.iterrows():
+        parts = [f"{row['Division']}:"]
+        for sc in share_cols:
+            parts.append(f"{sc}={row[sc]:.1f}%")
+        lines.append("  - " + " ".join(parts))
+
+    if "Shift_pp" in result_df.columns:
+        biggest_gain = result_df.loc[result_df["Shift_pp"].idxmax()]
+        biggest_loss = result_df.loc[result_df["Shift_pp"].idxmin()]
+        lines.append(f"\nBiggest share gain: {biggest_gain['Division']} ({biggest_gain['Shift_pp']:+.1f}pp)")
+        lines.append(f"Biggest share loss: {biggest_loss['Division']} ({biggest_loss['Shift_pp']:+.1f}pp)")
+
+        # HHI concentration check
+        for sc in share_cols:
+            hhi = (result_df[sc] ** 2).sum()
+            lines.append(f"Concentration (HHI) for {sc}: {hhi:.0f}")
+
+    return "\n".join(lines)
+
+
+def summarize_waterfall(result_df: pd.DataFrame, metric: str = "margin") -> str:
+    """Summarize margin waterfall results."""
+    if result_df is None or result_df.empty:
+        return "No waterfall data available."
+
+    lines = []
+    year_cols = [c for c in result_df.columns if c not in ("Group", "Change", "Change %")]
+
+    if len(year_cols) >= 2:
+        yr_start, yr_end = year_cols[0], year_cols[1]
+        total_start = result_df[yr_start].sum()
+        total_end = result_df[yr_end].sum()
+        lines.append(f"Starting {metric} ({yr_start}): ${total_start:,.0f}")
+        lines.append(f"Ending {metric} ({yr_end}): ${total_end:,.0f}")
+        lines.append(f"Net change: ${total_end - total_start:,.0f}")
+
+    if "Change" in result_df.columns:
+        sorted_df = result_df.sort_values("Change", ascending=False)
+        top_contributor = sorted_df.iloc[0]
+        top_drag = sorted_df.iloc[-1]
+        lines.append(f"\nTop positive contributor: {top_contributor['Group']} (${top_contributor['Change']:+,.0f})")
+        lines.append(f"Top negative contributor: {top_drag['Group']} (${top_drag['Change']:+,.0f})")
+
+        lines.append(f"\nAll contributions:")
+        for _, row in sorted_df.iterrows():
+            lines.append(f"  - {row['Group']}: ${row['Change']:+,.0f} ({row['Change %']:+.1f}%)")
+
+    return "\n".join(lines)
+
+
+def summarize_scorecard(result_df: pd.DataFrame) -> str:
+    """Summarize KPI scorecard results."""
+    if result_df is None or result_df.empty:
+        return "No scorecard data available."
+
+    lines = []
+
+    # Count RAG statuses
+    if "RAG" in result_df.columns:
+        greens = result_df["RAG"].str.contains("🟢").sum()
+        yellows = result_df["RAG"].str.contains("🟡").sum()
+        reds = result_df["RAG"].str.contains("🔴").sum()
+        lines.append(f"RAG status: {greens} 🟢, {yellows} 🟡, {reds} 🔴")
+
+    # Total row
+    total_row = result_df[result_df["Division"] == "TOTAL"]
+    if not total_row.empty:
+        tr = total_row.iloc[0]
+        growth_col = "YoY_Growth%"
+        if growth_col in tr:
+            lines.append(f"Overall YoY growth: {tr[growth_col]:+.1f}%")
+
+    # Division details
+    div_rows = result_df[result_df["Division"] != "TOTAL"]
+    if not div_rows.empty and "YoY_Growth%" in div_rows.columns:
+        best = div_rows.loc[div_rows["YoY_Growth%"].idxmax()]
+        worst = div_rows.loc[div_rows["YoY_Growth%"].idxmin()]
+        lines.append(f"\nStrongest division: {best['Division']} ({best['YoY_Growth%']:+.1f}% growth)")
+        lines.append(f"Weakest division: {worst['Division']} ({worst['YoY_Growth%']:+.1f}% growth)")
+
+    lines.append(f"\nDivision details:")
+    for _, row in div_rows.iterrows():
+        rag = row.get("RAG", "")
+        growth = row.get("YoY_Growth%", 0)
+        margin_chg = row.get("Margin_Change_pp", 0)
+        lines.append(f"  - {row['Division']}: {rag} growth={growth:+.1f}%, margin change={margin_chg:+.1f}pp")
+
+    return "\n".join(lines)
+
+
+def summarize_elasticity(result_df: pd.DataFrame) -> str:
+    """Summarize price elasticity results."""
+    if result_df is None or result_df.empty:
+        return "No elasticity data available."
+
+    lines = []
+    group_col = result_df.columns[0]  # 'Category' or 'Product'
+
+    # Get unique elasticity values per group (scenario table has many rows per group)
+    if "Elasticity" in result_df.columns:
+        unique_elas = result_df.drop_duplicates(subset=[group_col])[[group_col, "Elasticity"]]
+        unique_elas = unique_elas.sort_values("Elasticity")
+
+        lines.append("Price elasticity by category:")
+        for _, row in unique_elas.iterrows():
+            e = row["Elasticity"]
+            label = "highly elastic" if abs(e) > 1.5 else ("elastic" if abs(e) > 0.8 else "inelastic")
+            lines.append(f"  - {row[group_col]}: Ed={e:.2f} ({label})")
+
+        most_sensitive = unique_elas.iloc[0]
+        least_sensitive = unique_elas.iloc[-1] if len(unique_elas) > 1 else unique_elas.iloc[0]
+        lines.append(f"\nMost price-sensitive: {most_sensitive[group_col]} (Ed={most_sensitive['Elasticity']:.2f})")
+        lines.append(f"Least price-sensitive: {least_sensitive[group_col]} (Ed={least_sensitive['Elasticity']:.2f})")
+
+    # Show a sample scenario
+    if "Price_Change%" in result_df.columns and "Revenue_Impact%" in result_df.columns:
+        sample = result_df[result_df["Price_Change%"] == 10]
+        if not sample.empty:
+            lines.append(f"\nImpact of +10% price increase:")
+            for _, row in sample.iterrows():
+                lines.append(f"  - {row[group_col]}: units {row.get('Projected_Units_Change%', 0):+.1f}%, revenue {row['Revenue_Impact%']:+.1f}%")
+
+    return "\n".join(lines)
+
+
+def summarize_brand_benchmarking(result_df: pd.DataFrame) -> str:
+    """Summarize brand benchmarking results."""
+    if result_df is None or result_df.empty:
+        return "No brand benchmarking data available."
+
+    lines = []
+
+    if "Category" in result_df.columns and "Share%" in result_df.columns:
+        categories = result_df["Category"].unique()
+        lines.append(f"Brand share analysis across {len(categories)} categories:")
+
+        for cat in categories:
+            cat_data = result_df[result_df["Category"] == cat].sort_values("Share%", ascending=False)
+            leader = cat_data.iloc[0]
+            lines.append(
+                f"\n  {cat}:"
+                f"\n    Leader: {leader['Brand']} ({leader['Share%']:.1f}% share, margin: {leader['Margin_Rate']:.1%})"
+            )
+            if len(cat_data) > 1:
+                runner_up = cat_data.iloc[1]
+                lines.append(f"    Runner-up: {runner_up['Brand']} ({runner_up['Share%']:.1f}%)")
+
+    return "\n".join(lines)
+
+
+def summarize_growth_margin(result_df: pd.DataFrame) -> str:
+    """Summarize growth-margin matrix results."""
+    if result_df is None or result_df.empty:
+        return "No growth-margin data available."
+
+    lines = []
+
+    if "Quadrant" in result_df.columns:
+        for quadrant in ["Stars", "Cash Cows", "Question Marks", "Dogs"]:
+            q_data = result_df[result_df["Quadrant"] == quadrant]
+            if not q_data.empty:
+                items = ", ".join(q_data["Group"].tolist())
+                lines.append(f"{quadrant}: {items}")
+
+        lines.append(f"\nDetailed positioning:")
+        for _, row in result_df.iterrows():
+            lines.append(
+                f"  - {row['Group']}: margin={row['Margin_Rate']:.1f}%, "
+                f"growth={row['YoY_Growth%']:+.1f}%, quadrant={row['Quadrant']}"
+            )
+
+    return "\n".join(lines)
+
+
 def build_data_summary(tool_name: str, result_df, callouts=None, metric="sales") -> str:
     """
     Route to the correct summarizer based on tool name.
@@ -288,5 +542,21 @@ def build_data_summary(tool_name: str, result_df, callouts=None, metric="sales")
         return summarize_anomalies(result_df, callouts or [], metric)
     elif tool_name == "price_volume_margin":
         return summarize_price_volume(result_df)
+    elif tool_name == "store_performance":
+        return summarize_store_performance(result_df, metric)
+    elif tool_name == "seasonality_trends":
+        return summarize_seasonality(result_df, metric)
+    elif tool_name == "division_mix":
+        return summarize_division_mix(result_df, metric)
+    elif tool_name == "margin_waterfall":
+        return summarize_waterfall(result_df, metric)
+    elif tool_name == "kpi_scorecard":
+        return summarize_scorecard(result_df)
+    elif tool_name == "price_elasticity":
+        return summarize_elasticity(result_df)
+    elif tool_name == "brand_benchmarking":
+        return summarize_brand_benchmarking(result_df)
+    elif tool_name == "growth_margin_matrix":
+        return summarize_growth_margin(result_df)
     else:
         return "Analysis complete. Data is displayed in the chart and table."

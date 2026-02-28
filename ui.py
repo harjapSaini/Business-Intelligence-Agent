@@ -201,6 +201,10 @@ header[data-testid="stHeader"] {
 .stMarkdown p, .stMarkdown li, h1, h2, h3, h4, h5, h6 {
     color: #FAFAFA !important;
 }
+.stMarkdown code {
+    background-color: #262730 !important;
+    color: #FAFAFA !important;
+}
 .stMetric label {
     color: #B0BEC5 !important;
 }
@@ -415,11 +419,16 @@ def render_sidebar(summary: dict, ollama_ok: bool, ollama_msg: str) -> None:
 # =====================================================================
 
 EXAMPLE_QUESTIONS = [
+    "How is the business performing overall?",
     "Which division grew the most year over year?",
-    "Show me the top brands by sales in the West region",
+    "Which stores are underperforming?",
+    "Is there a seasonal pattern in Gardening?",
+    "What percentage of sales does each division represent?",
+    "Why did our margins change?",
+    "Where are our stars and dogs?",
+    "Which categories are most price sensitive?",
+    "Which brand owns the Fitness category?",
     "Project Apparel division sales into 2025",
-    "Are there any anomalies in product margins?",
-    "What is the pricing sweet spot for Tools division?",
 ]
 
 
@@ -453,7 +462,7 @@ def render_welcome() -> str | None:
 #  CHAT MESSAGE RENDERING
 # =====================================================================
 
-def render_chat_message(msg: dict, msg_idx: int = 0) -> None:
+def render_chat_message(msg: dict, msg_idx: int = 0, is_dark: bool = False) -> None:
     """
     Render a single chat message (user or assistant).
 
@@ -487,6 +496,9 @@ def render_chat_message(msg: dict, msg_idx: int = 0) -> None:
             # Chart
             fig = msg.get("figure")
             if fig is not None:
+                # Force update the template right before rendering 
+                # so older session_state charts match the active theme toggle
+                fig.update_layout(template="plotly_dark" if is_dark else "plotly_white")
                 st.plotly_chart(fig, use_container_width=True, theme=None, key=f"chart_{msg_idx}")
 
             # Data table (collapsed)

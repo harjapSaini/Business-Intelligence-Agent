@@ -18,7 +18,7 @@ The new sequence within `process_question()`:
 
 ### 2. Data Summarizers (`insight_builder.py`)
 
-- Wrote five specialized summarizer functions (one for each tool output type).
+- Wrote thirteen specialized summarizer functions (one for each tool output type).
 - E.g., `summarize_yoy()` takes a grouped pandas dataframe and returns a concise string: "Apparel hit 250k in 2023 vs 275k in 2024 (10% growth)."
 - This approach feeds the LLM extreme density data without blowing out the token context window with massive raw CSV strings.
 

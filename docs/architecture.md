@@ -32,7 +32,7 @@
 | `ollama_client.py`   | Pass 1 (Router Prompt), Pass 2 (Insight Prompt), API calls   |
 | `insight_builder.py` | Summarizes raw DataFrame outputs into dense text for the LLM |
 | `ui.py`              | CSS injection, dark mode toggle, sidebars, components        |
-| `tools/`             | 5 analysis functions + tool router dispatcher                |
+| `tools/`             | 13 analysis functions + tool router dispatcher               |
 
 ## Data Flow (Two-Pass LLM Architecture)
 
@@ -103,3 +103,4 @@ User Question
 3. Add `"new_tool_name"` to `VALID_TOOLS` in `config.py`
 4. Add a case in `tools/router.py`
 5. Update the system prompt in `ollama_client.py` with tool description and trigger phrases
+6. Add a `summarize_*()` function + `elif` branch in `insight_builder.py`

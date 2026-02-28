@@ -15,7 +15,7 @@ Phase 5 elevated the app's visual presentation from a default Streamlit dashboar
 
 ### 2. Plotly Theme Synchronization
 
-- Standardized the color palette across all five charts in the `tools/` directory.
+- Standardized the color palette across all thirteen charts in the `tools/` directory.
 - Mapped 2023 to Canadian Tire Red (`#D32F2F`) and 2024 to an Enterprise Blue (`#1976D2`) for consistent visual mapping.
 
 ### 3. Welcome Screen Experience

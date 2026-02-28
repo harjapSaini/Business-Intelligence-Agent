@@ -135,8 +135,20 @@ def process_question(question: str, df, summary: dict, is_dark_mode: bool = Fals
     metric = filters.get("metric", "sales")
     data_summary = build_data_summary(tool_name, result_df, callouts, metric)
 
+    # ── Build filter context so LLM knows the data scope ───
+    filter_labels = {
+        "division": "Division", "region": "Region",
+        "category": "Category", "brand": "Brand",
+    }
+    active = [
+        f"{filter_labels[k]}={filters[k]}"
+        for k in filter_labels
+        if filters.get(k) and str(filters[k]).lower() not in ("null", "none", "")
+    ]
+    filter_context = ", ".join(active) if active else ""
+
     # ── Pass 2: Generate data-driven insight ────────────────
-    insight_response = generate_insight(question, tool_name, data_summary)
+    insight_response = generate_insight(question, tool_name, data_summary, filter_context)
 
     # ── Update session memory ───────────────────────────────
     update_memory(tool_name, filters, insight_response["insight"], result_df)
@@ -213,7 +225,7 @@ def main():
             st.rerun()
     else:
         for idx, msg in enumerate(st.session_state.messages):
-            render_chat_message(msg, msg_idx=idx)
+            render_chat_message(msg, msg_idx=idx, is_dark=is_dark)
 
         # Show suggestions from last assistant message
         last_msg = st.session_state.messages[-1]

@@ -133,10 +133,10 @@ Available filter values:
 - metrics: ["sales", "margin", "units", "margin_rate"]
 - years: {df_summary['years']}
 
-You have exactly 5 analysis tools. Pick the ONE best tool for each question:
+You have exactly 13 analysis tools. Pick the ONE best tool for each question:
 
 1. "yoy_comparison" - Use for year-over-year comparisons, growth analysis, performance trends.
-   Filters: metric, division, region, category, brand (all optional, default metric="sales")
+   Filters: metric (sales, margin, units, margin_rate), group_by (division, region, brand, category), division, region, category, brand
    Triggers: "grew", "vs last year", "year over year", "performance", "top/bottom by", "worst/best"
 
 2. "brand_region_crosstab" - Use for comparing brands across regions, or regional performance by brand.
@@ -155,25 +155,63 @@ You have exactly 5 analysis tools. Pick the ONE best tool for each question:
    Filters: division, category
    Triggers: "price", "pricing", "sweet spot", "price vs margin", "relationship between price"
 
+6. "store_performance" - Use for store-level analysis: top/bottom stores, store size vs performance.
+   Filters: metric (sales, margin, units, margin_rate), top_n (integer, default 10), view ("top" or "bottom"), division, region, category, brand
+   Triggers: "store", "stores", "underperforming", "top stores", "bottom stores", "store size", "larger stores", "which locations"
+
+7. "seasonality_trends" - Use for within-year seasonal patterns, monthly or quarterly trends overlaid across years.
+   Filters: time_grain ("month" or "quarter"), metric, division, region, category, brand
+   Triggers: "season", "seasonal", "monthly", "quarterly", "when do", "peak", "which quarter", "which month", "time trend", "within-year"
+
+8. "division_mix" - Use for revenue/sales mix by division, portfolio balance, how divisions share total business.
+   Filters: metric (sales, margin, units), division, region, category, brand
+   Triggers: "mix", "percentage", "share", "proportion", "concentrated", "revenue mix", "product mix", "each division represent", "portfolio balance"
+
+9. "margin_waterfall" - Use for explaining what drove margin or sales changes between years, decomposition by division.
+   Filters: metric (margin, sales, units), group_by (division, region, brand, category), division, region, category, brand
+   Triggers: "waterfall", "margin change", "why did margins", "break down", "contributed", "profit growth", "decomposition", "what drove"
+
+10. "kpi_scorecard" - Use for a full-business executive overview, health check, KPI dashboard. No filters needed.
+    Filters: none
+    Triggers: "overview", "scorecard", "summary", "business health", "how is the business", "KPI", "overall performance", "dashboard", "summarize everything"
+
+11. "price_elasticity" - Use for estimating price sensitivity, demand elasticity, impact of price changes on volume.
+    Filters: division, region, category, brand
+    Triggers: "elasticity", "price sensitive", "raise prices", "what happens if", "impact of price change", "demand sensitivity"
+
+12. "brand_benchmarking" - Use for head-to-head brand comparisons within categories, market share by brand.
+    Filters: metric (sales, margin, units), division, region, category, brand
+    Triggers: "compare brands", "brand vs", "market share", "who owns", "brand dominance", "head-to-head", "benchmarking", "which brand leads"
+
+13. "growth_margin_matrix" - Use for strategic portfolio view (BCG-style), identifying stars, cash cows, question marks, dogs.
+    Filters: group_by (division or category), division, region, category, brand
+    Triggers: "strategic", "stars", "dogs", "cash cows", "BCG", "invest", "portfolio strategy", "growth margin matrix", "2x2", "quadrant"
+
 Session memory (context from prior questions):
 {memory_block}
 
 IMPORTANT RULES:
 - If the user references "that region", "the top brand", "it", etc., resolve from session memory above.
+- If the user mentions a specific region, division, category, or brand, you MUST include it in the 'filters' dictionary! Do not leave it null if mentioned.
+- If the user asks for a specific metric (e.g. "margin", "units"), you MUST include it in the 'filters' dictionary (e.g. "metric": "margin").
+- If the user asks to see data "by brand" or "top brands", set "group_by": "brand". If they ask "by category", set "group_by": "category".
 - Always pick the MOST APPROPRIATE tool. When in doubt, use yoy_comparison.
 - Your ONLY job is to pick the tool and filters. Do NOT generate insights.
 
 You MUST respond with ONLY a valid JSON object in this EXACT format, nothing else:
 {{{{
-  "tool": "tool_name_here",
+  "tool": "yoy_comparison",
   "filters": {{{{
     "metric": "sales",
-    "division": null,
-    "region": null,
+    "division": "Apparel",
+    "region": "West",
     "category": null,
-    "brand": null,
+    "brand": "Nike",
     "group_by": null,
-    "group_value": null
+    "group_value": null,
+    "time_grain": null,
+    "top_n": null,
+    "view": null
   }}}}
 }}}}
 
@@ -365,7 +403,7 @@ def ask_llm(question: str, session_memory: dict, df_summary: dict) -> dict:
 #  PASS 2: GENERATE DATA-DRIVEN INSIGHT
 # =====================================================================
 
-def build_insight_prompt(question: str, tool_name: str, data_summary: str) -> str:
+def build_insight_prompt(question: str, tool_name: str, data_summary: str, filter_context: str = "") -> str:
     """
     Build the system prompt for the second LLM call.
 
@@ -373,16 +411,21 @@ def build_insight_prompt(question: str, tool_name: str, data_summary: str) -> st
     write a specific, number-backed business insight.
 
     Args:
-        question:     The user's original question.
-        tool_name:    The tool that was used.
-        data_summary: Compact text summary of the tool's output.
+        question:       The user's original question.
+        tool_name:      The tool that was used.
+        data_summary:   Compact text summary of the tool's output.
+        filter_context: Description of the active filters applied.
 
     Returns:
         str - the system prompt for Pass 2.
     """
-    return f"""You are a senior Business Intelligence analyst at Canadian Tire.
-You have just run the "{tool_name.replace('_', ' ')}" analysis tool and received real data results.
+    scope_line = ""
+    if filter_context:
+        scope_line = f"\nDATA SCOPE: {filter_context} (this is NOT company-wide data)\n"
 
+    return f"""You are a senior Business Intelligence analyst.
+You have just run the "{tool_name.replace('_', ' ')}" analysis tool and received real data results.
+{scope_line}
 Here are the ACTUAL DATA RESULTS from the analysis:
 ---
 {data_summary}
@@ -392,11 +435,17 @@ Based on these real numbers, write a business insight and suggest follow-up ques
 
 RULES FOR YOUR INSIGHT:
 - Reference SPECIFIC numbers, percentages, and entity names from the data above.
-- Explain what the numbers MEAN for the business (e.g. "Sports grew 15.5% YoY, outpacing all other divisions, likely driven by seasonal demand.").
-- Include business reasoning: WHY might these patterns exist? What should a business leader do about it?
+- Explain what the numbers MEAN for the business.
+- Include business reasoning: WHY might these patterns exist? Use general terms like 'seasonality' or 'promotional activity' when speculating.
 - If there are notable outliers or surprises in the data, call them out.
 - Write 3-5 sentences. Be specific and analytical, not vague.
 - Do NOT say "likely shows" or "may indicate" - you have the real data, so state facts.
+
+STRICT CONSTRAINTS:
+- Do NOT reference specific external companies, retailers, or brand names (e.g. 'Canadian Tire', 'Walmart', 'Amazon') unless they appear in the data results above.
+- Do NOT invent highly specific external events or campaigns that are not in the data.
+- Only mention brand names, product names, divisions, and regions that appear in the DATA RESULTS section above.
+- When speculating on causes, keep it general (e.g. 'may be driven by seasonality' is OK, 'driven by their Q3 marketing campaign' is NOT OK unless the data shows it).
 
 RULES FOR SUGGESTIONS:
 - Suggest 3 follow-up questions that reference specific entities from the data.
@@ -420,19 +469,21 @@ def generate_insight(
     question: str,
     tool_name: str,
     data_summary: str,
+    filter_context: str = "",
 ) -> dict:
     """
     Pass 2: Generate a data-driven insight using the actual tool results.
 
     Args:
-        question:     The user's original question.
-        tool_name:    The tool that produced the results.
-        data_summary: Compact text summary of the tool's DataFrame output.
+        question:       The user's original question.
+        tool_name:      The tool that produced the results.
+        data_summary:   Compact text summary of the tool's DataFrame output.
+        filter_context: Description of the active filters applied.
 
     Returns:
         dict with keys: 'insight', 'suggestions'
     """
-    system_prompt = build_insight_prompt(question, tool_name, data_summary)
+    system_prompt = build_insight_prompt(question, tool_name, data_summary, filter_context)
 
     try:
         response = ollama.chat(

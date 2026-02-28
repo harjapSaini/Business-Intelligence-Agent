@@ -14,6 +14,7 @@ from config import YOY_COLORS
 
 def yoy_comparison(
     df: pd.DataFrame,
+    group_by: str = "division",
     metric: str = "sales",
     division: str = None,
     region: str = None,
@@ -26,6 +27,7 @@ def yoy_comparison(
 
     Args:
         df:       Full DataFrame with KPI columns.
+        group_by: Column to group by ('division', 'region', 'category', 'brand').
         metric:   One of 'sales', 'margin', 'units', 'margin_rate'.
         division: Optional division filter.
         region:   Optional region filter.
@@ -45,26 +47,28 @@ def yoy_comparison(
 
     # Apply filters
     filtered = df.copy()
+    active_filters = []
     if division:
         filtered = filtered[filtered["PRODUCT_DIVISION"] == division]
+        active_filters.append(f"Div: {division}")
     if region:
         filtered = filtered[filtered["REGION"] == region]
+        active_filters.append(f"Reg: {region}")
     if category:
         filtered = filtered[filtered["PRODUCT_CATEGORY"] == category]
+        active_filters.append(f"Cat: {category}")
     if brand:
         filtered = filtered[filtered["BRAND"] == brand]
+        active_filters.append(f"Brand: {brand}")
 
-    # Decide grouping axis
-    if brand:
-        group_col = "PRODUCT_CATEGORY"
-    elif category:
-        group_col = "BRAND"
-    elif division:
-        group_col = "PRODUCT_CATEGORY"
-    elif region:
-        group_col = "PRODUCT_DIVISION"
-    else:
-        group_col = "PRODUCT_DIVISION"
+    # Decide grouping axis from formal parameter
+    group_col_map = {
+        "division": "PRODUCT_DIVISION",
+        "region": "REGION",
+        "brand": "BRAND",
+        "category": "PRODUCT_CATEGORY",
+    }
+    group_col = group_col_map.get(group_by.lower(), "PRODUCT_DIVISION")
 
     # Aggregate
     if metric == "margin_rate":
@@ -91,13 +95,19 @@ def yoy_comparison(
     # Chart
     agg["YEAR"] = agg["YEAR"].astype(str)
     metric_label = metric.replace("_", " ").title()
+    
+    # Build dynamic title
+    title_text = f"YoY Comparison - {metric_label}"
+    if active_filters:
+        title_text += f" ({', '.join(active_filters)})"
+
     fig = px.bar(
         agg,
         x=group_col,
         y=col,
         color="YEAR",
         barmode="group",
-        title=f"YoY Comparison - {metric_label}",
+        title=title_text,
         labels={col: metric_label, group_col: group_col.replace("_", " ").title()},
         color_discrete_map=YOY_COLORS,
     )

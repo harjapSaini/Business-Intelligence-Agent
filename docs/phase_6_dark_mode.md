@@ -19,7 +19,7 @@ Phase 6 introduced a true, high-quality Dark Mode theme switch, allowing the use
 
 ### 3. Plotly Dynamic Templating
 
-- Passed the active boolean `is_dark_mode` down from the global session state in `agent.py` through the router and into all 5 target tool scripts.
+- Passed the active boolean `is_dark_mode` down from the global session state in `agent.py` through the router and into all 13 target tool scripts.
 - Configured Plotly to switch its base template from `plotly_white` to `plotly_dark` dynamically to match the active UI shell.
 
 ## Verification

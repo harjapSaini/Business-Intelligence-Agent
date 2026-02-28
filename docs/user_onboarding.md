@@ -23,8 +23,10 @@ Use the chat bar at the bottom to query the data. Try specifically filtering by:
 
 - **Regions:** West, East, Central, Atlantic
 - **Divisions:** Sports, Tools, Apparel, Gardening, Food
-- **Metrics:** Sales, Margin, Volume
+- **Metrics:** Sales, Margin, Volume, Units
 - **Time:** YoY (Year-over-Year), 2023, 2024, or projecting into 2025
+- **Stores:** Top/bottom performers, store size analysis
+- **Seasonality:** Monthly or quarterly patterns
 
 _Example Queries:_
 
@@ -32,6 +34,14 @@ _Example Queries:_
 - "Show me the top brands by sales in the West region"
 - "Project Apparel division sales into 2025"
 - "What is the pricing sweet spot for Tools?"
+- "How is the business performing overall?" _(KPI Scorecard)_
+- "Which stores are underperforming?" _(Store Performance)_
+- "Is there a seasonal pattern in Gardening?" _(Seasonality Trends)_
+- "What percentage of sales does each division represent?" _(Division Mix)_
+- "Why did our margins change?" _(Margin Waterfall)_
+- "Where are our stars and dogs?" _(Growth-Margin Matrix)_
+- "Which categories are most price sensitive?" _(Price Elasticity)_
+- "Which brand owns the Fitness category?" _(Brand Benchmarking)_
 
 #### 2. Reading the Assistant's Response
 

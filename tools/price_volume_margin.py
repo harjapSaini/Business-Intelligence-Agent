@@ -14,7 +14,9 @@ from config import CHART_COLORS
 def price_volume_margin(
     df: pd.DataFrame,
     division: str = None,
+    region: str = None,
     category: str = None,
+    brand: str = None,
     _is_dark_mode: bool = False,
 ) -> tuple:
     """
@@ -23,7 +25,9 @@ def price_volume_margin(
     Args:
         df:       Full DataFrame.
         division: Optional division filter.
+        region:   Optional region filter.
         category: Optional category filter.
+        brand:    Optional brand filter.
 
     Returns:
         (plotly.Figure, pd.DataFrame) - bubble chart + product summary.
@@ -31,8 +35,12 @@ def price_volume_margin(
     filtered = df.copy()
     if division:
         filtered = filtered[filtered["PRODUCT_DIVISION"] == division]
+    if region:
+        filtered = filtered[filtered["REGION"] == region]
     if category:
         filtered = filtered[filtered["PRODUCT_CATEGORY"] == category]
+    if brand:
+        filtered = filtered[filtered["BRAND"] == brand]
 
     # Product-level aggregation
     product_agg = (
@@ -50,11 +58,19 @@ def price_volume_margin(
     ).fillna(0)
 
     # Build chart
-    title_suffix = ""
+    active_filters = []
     if division:
-        title_suffix += f" - {division}"
+        active_filters.append(f"Div: {division}")
+    if region:
+        active_filters.append(f"Reg: {region}")
     if category:
-        title_suffix += f" / {category}"
+        active_filters.append(f"Cat: {category}")
+    if brand:
+        active_filters.append(f"Brand: {brand}")
+
+    title_suffix = ""
+    if active_filters:
+        title_suffix = f" ({', '.join(active_filters)})"
 
     fig = px.scatter(
         product_agg,

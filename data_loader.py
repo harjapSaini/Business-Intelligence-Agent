@@ -54,6 +54,7 @@ def get_dataset_summary(df: pd.DataFrame) -> dict:
         "divisions": sorted(df["PRODUCT_DIVISION"].unique().tolist()),
         "categories": sorted(df["PRODUCT_CATEGORY"].unique().tolist()),
         "brands": sorted(df["BRAND"].unique().tolist()),
+        "store_names": sorted(df["STORE_NAME"].unique().tolist()) if "STORE_NAME" in df.columns else [],
         "sales_by_year": sales_by_year,
     }
     return summary

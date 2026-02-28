@@ -5,19 +5,27 @@ The Private Business Intelligence Agent is a powerful local analysis tool, but i
 ## Technical Capabilities
 
 1. **Absolute Privacy:** The architecture explicitly prevents data exfiltration. The target CSV file never leaves your device. The LLM engine (Ollama) runs inside a local daemon process on your hardware.
-2. **Intelligent Routing:** The agent translates natural language into 1 of 5 explicit mathematical Python paradigms via zero-shot JSON extraction, eliminating hallucinations in mathematical logic.
+2. **Intelligent Routing:** The agent translates natural language into 1 of 13 explicit mathematical Python paradigms via zero-shot JSON extraction, eliminating hallucinations in mathematical logic.
 3. **Multi-Turn Contextual Memory:** The agent successfully retains filter matrices (Region, Brand, Category, Division) across conversational turns until explicitly overwritten or cleared.
 4. **Adaptive Insight Generation:** Through its Two-Pass Architecture, textual insights are written by the LLM only _after_ observing a highly compressed representation of actual DataFrame results, guaranteeing narrative accuracy correlated to the math.
 5. **Theme-Aware Data Visualizations:** All Plotly charts and Pandas structures inherit explicitly declared light/dark cascading style sheets to guarantee contrast compliance visually.
 
 ## Known Limitations
 
-1. **Pre-defined Analytics Tooling:** The agent cannot write arbitrary Python code on the fly to answer completely novel queries. It must map your question to one of the 5 predefined tools:
+1. **Pre-defined Analytics Tooling:** The agent cannot write arbitrary Python code on the fly to answer completely novel queries. It must map your question to one of the 13 predefined tools:
    - YoY Comparison
    - Brand x Region Crosstabulation
    - Single-Entity Multi-Year Forecasting
    - Macro Anomaly Detection
    - Price vs Volume vs Margin Clustering
+   - Store Performance Analysis
+   - Seasonality & Time Trend Analysis
+   - Division Mix Analysis
+   - Margin Waterfall / Profitability Decomposition
+   - KPI Scorecard / Executive Summary
+   - Price Elasticity Estimator
+   - Competitive Brand Benchmarking
+   - Growth-Margin Matrix (BCG-Style)
      If a question falls totally outside these bounds, it will attempt to default to a basic YoY comparison.
 2. **Model Token Limits:** The default `llama3.2:3b` model is highly capable but operates on constrained hardware. Excessively long or hyper-complex queries might crash the prompt structure or result in a timeout/failure to generate valid JSON.
 3. **Data Dependency:** The agent expects the input data structure (`data/mock_retail_data.csv`) to follow a specific schema with designated columns (`Region`, `Division`, `Category`, `Brand`, `Sales`, `Margin`, `Volume`, `Year`). Swapping the dataset for an entirely different schema will require codebase refactoring.
