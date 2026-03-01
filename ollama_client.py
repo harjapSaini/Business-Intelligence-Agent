@@ -124,7 +124,7 @@ You analyze a retail dataset with {df_summary['total_rows']:,} rows.
 
 === SECTION 1: TOOL DEFINITIONS ===
 
-You have exactly 13 tools. You MUST pick the ONE best tool for each question.
+You have exactly 14 tools. You MUST pick the ONE best tool for each question.
 
 TOOL 1: "yoy_comparison"
   Description: Year-over-year comparisons, growth analysis, performance by division/region/brand.
@@ -258,6 +258,22 @@ TOOL 13: "growth_margin_matrix"
     - "Growth vs margin quadrant analysis"
   Strong keywords: "stars", "dogs", "cash cows", "BCG", "quadrant", "portfolio strategy", "growth margin matrix", "invest"
 
+TOOL 14: "out_of_scope"
+  Description: Use this when the question asks for data or metrics that do not exist in this dataset.
+  Use when question asks about:
+    - Customer-level data (average order value, customer count, repeat purchases, customer lifetime value, churn)
+    - Inventory or stock levels
+    - Competitor data or external benchmarks
+    - Employee or HR data
+    - Website traffic or digital metrics
+    - Any metric requiring data not in the available tables
+  Example questions:
+    - "What is the average order value?"
+    - "How many customers do we have?"
+    - "What is the customer retention rate?"
+    - "How does our pricing compare to competitors?"
+  Strong keywords: "average order value", "aov", "customer count", "number of customers", "retention", "churn", "inventory", "stock level", "competitor", "website traffic"
+
 === SECTION 2: FILTER EXTRACTION RULES ===
 
 Extract ALL filters mentioned in the question. Never return an empty filters object. Always include at minimum the metric field.
@@ -322,6 +338,24 @@ A: {{{{"tool": "seasonality_trends", "filters": {{"division": "Gardening", "metr
 
 Q: "Where are our stars and dogs?"
 A: {{{{"tool": "growth_margin_matrix", "filters": {{"metric": "sales", "group_by": "division"}}}}}}
+
+Q: "Which brands are driving the Apparel decline?"
+A: {{{{"tool": "yoy_comparison", "filters": {{"group_by": "brand", "division": "Apparel", "metric": "sales"}}}}}}
+
+Q: "Which brands are underperforming in Sports?"
+A: {{{{"tool": "yoy_comparison", "filters": {{"group_by": "brand", "division": "Sports", "metric": "sales"}}}}}}
+
+Q: "What is causing the Tools decline?"
+A: {{{{"tool": "yoy_comparison", "filters": {{"group_by": "brand", "division": "Tools", "metric": "sales"}}}}}}
+
+Q: "Which region has the most growth opportunity and what is driving it?"
+A: {{{{"tool": "yoy_comparison", "filters": {{"group_by": "region", "metric": "sales"}}}}}}
+
+Q: "How are the different regions performing?"
+A: {{{{"tool": "yoy_comparison", "filters": {{"group_by": "region", "metric": "sales"}}}}}}
+
+Q: "Which region is growing fastest?"
+A: {{{{"tool": "yoy_comparison", "filters": {{"group_by": "region", "metric": "sales"}}}}}}
 
 === SECTION 4: OUTPUT FORMAT RULES ===
 
@@ -439,18 +473,36 @@ def validate_routing(question: str, llm_tool: str) -> str:
     """
     q = question.lower()
 
-    # ── Brand keywords — highest priority ───────────────────
+    # ── Out-of-scope — highest priority ─────────────────────
+    out_of_scope_kw = [
+        "average order value", "aov", "customer count",
+        "number of customers", "how many customers",
+        "retention rate", "churn", "clv", "lifetime value",
+        "inventory", "stock level", "reorder", "competitor",
+        "market share", "website traffic", "digital", "online sales",
+        "foot traffic", "employee", "headcount",
+    ]
+    if any(kw in q for kw in out_of_scope_kw):
+        return "out_of_scope"
+
+    # ── Brand keywords — highest tool priority ─────────────
     brand_keywords = [
         "brand", "brands", "top brands", "best brands", "which brands",
         "brand performance",
     ] + _BRAND_NAMES
     if any(kw in q for kw in brand_keywords):
-        # But NOT if the question is really about YoY brand growth
-        yoy_signals = ["year over year", "yoy", "grew", "growth rate",
-                       "vs last year", "compared to last year",
-                       "2023 vs 2024", "change over time"]
-        if not any(yw in q for yw in yoy_signals):
-            return "brand_region_crosstab"
+        # But NOT if the question is really about YoY brand growth/decline
+        yoy_signals = [
+            "year over year", "yoy", "grew", "growth rate",
+            "vs last year", "compared to last year",
+            "2023 vs 2024", "change over time",
+            "decline", "declining", "fell", "dropped",
+            "decreased", "worst performing", "underperforming",
+            "driving the", "causing the", "behind the",
+        ]
+        if any(yw in q for yw in yoy_signals):
+            return "yoy_comparison"
+        return "brand_region_crosstab"
 
     # ── KPI / overview ──────────────────────────────────────
     overview_kw = ["overall", "overview", "scorecard", "dashboard",
@@ -465,6 +517,17 @@ def validate_routing(question: str, llm_tool: str) -> str:
                     "margin change", "contributed to"]
     if any(kw in q for kw in waterfall_kw):
         return "margin_waterfall"
+
+    # ── Region analysis — before BCG to prevent "growth" collision ─
+    region_analysis_kw = [
+        "which region", "region has", "region with", "regions performing",
+        "regional performance", "regional growth", "regional opportunity",
+        "best region", "worst region", "region growing",
+        "growth opportunity", "most opportunity", "where should we invest",
+        "region comparison", "how are regions",
+    ]
+    if any(kw in q for kw in region_analysis_kw):
+        return "yoy_comparison"
 
     # ── BCG / growth-margin matrix ──────────────────────────
     bcg_kw = ["stars", "dogs", "cash cow", "bcg", "quadrant",
@@ -586,7 +649,7 @@ def extract_missing_filters(question: str, existing_filters: dict) -> dict:
             filters["metric"] = "margin_rate"
         elif "margin" in q:
             filters["metric"] = "margin"
-        elif "unit" in q:
+        elif any(w in q for w in ["units", "unit sold", "units sold", "volume"]):
             filters["metric"] = "units"
         else:
             filters["metric"] = "sales"  # always default to sales
@@ -594,8 +657,20 @@ def extract_missing_filters(question: str, existing_filters: dict) -> dict:
     # ── group_by ─────────────────────────────────────────────────────────
     # Used by: yoy_comparison, margin_waterfall, growth_margin_matrix, forecast_trendline
     if not filters.get("group_by") or str(filters["group_by"]).lower() in ("null", "none"):
-        if any(w in q for w in ["brand", "brands"]):
+        # Region-level analysis phrases → group by region
+        region_analysis_kw = [
+            "which region", "region has", "region with", "regions performing",
+            "regional performance", "regional growth", "regional opportunity",
+            "best region", "worst region", "region growing",
+            "growth opportunity", "most opportunity", "where should we invest",
+            "region comparison", "how are regions",
+        ]
+        if any(kw in q for kw in region_analysis_kw) and not filters.get("region"):
+            filters["group_by"] = "region"
+        elif any(w in q for w in ["brand", "brands"]):
             filters["group_by"] = "brand"
+            # If a division is also mentioned, keep it as a filter
+            # (division filter already extracted above — no change needed)
         elif any(w in q for w in ["category", "categories"]):
             filters["group_by"] = "category"
         elif any(w in q for w in ["region", "regions"]) and not filters.get("region"):

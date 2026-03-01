@@ -12,16 +12,19 @@ Relocated the insight generation step _after_ the tool returns its results.
 The new sequence within `process_question()`:
 
 1. **Pass 1 (Routing):** LLM analyzes the prompt and returns strictly JSON (tool name + filters).
-2. **Routing Safety Net:** `validate_routing()` keyword guard overrides incorrect tool selections. `extract_missing_filters()` fills any filter gaps the LLM missed (region, division, brand, metric, group_by, top_n, view).
-3. **Execution:** The router runs the selected Python tool, returning a chart, a dataframe, and statistical callouts.
-4. **Data Summarization:** A new module converts the dataframe into compact text.
-5. **Pass 2 (Synthesis):** The LLM receives the compact text summary + the original question, returning a narrative insight packed with real numbers.
+2. **Routing Safety Net:** `validate_routing()` keyword guard overrides incorrect tool selections — `out_of_scope` has highest priority, followed by specialized tools, then generic YoY as last resort. `extract_missing_filters()` fills any filter gaps the LLM missed (region, division, brand, metric, group_by, top_n, view).
+3. **Out-of-Scope Short-Circuit:** If the tool is `out_of_scope`, the pipeline skips tool execution and Pass 2 entirely, returning a targeted explanatory message via `build_out_of_scope_message()` with 3 redirect suggestions.
+4. **Execution:** The router runs the selected Python tool, returning a chart, a dataframe, and optionally a pre-computed insight string.
+5. **Pre-Computed Insight Check:** If the tool returned a non-empty pre-computed insight string, `agent.py` runs it through `clean_insight_text()` as a safety net and uses it directly — **skipping steps 6 and 7 entirely**. This yields faster, more deterministic responses.
+6. **Data Summarization:** (Only when no pre-computed insight) A summarizer module converts the dataframe into compact text.
+7. **Pass 2 (Synthesis):** (Only when no pre-computed insight) The LLM receives the compact text summary + the original question, returning a narrative insight packed with real numbers.
 
 ### 2. Data Summarizers (`insight_builder.py`)
 
 - Wrote thirteen specialized summarizer functions (one for each tool output type).
 - E.g., `summarize_yoy()` takes a grouped pandas dataframe and returns a directive format with BEST PERFORMER and KEY RISK labels.
 - `summarize_crosstab()` handles both single-region (Brand/Value columns) and multi-region format.
+- `summarize_price_volume()` operates on category-level aggregated data (12 product categories with `avg_price`, `margin_rate`, `total_units`, `total_sales`, `margin_pct` columns) and highlights top/bottom margin categories plus sweet-spot analysis ($80–$140 price range).
 - This approach feeds the LLM extreme density data without blowing out the token context window with massive raw CSV strings.
 
 ### 3. Prompt Re-Engineering (`ollama_client.py`)
@@ -43,6 +46,25 @@ The new sequence within `process_question()`:
 - `validate_insight_format()` catches 9 red-flag patterns in insight text: "Best region: Value", bullet counts, structured data dumps, length > 600 chars, etc.
 - `validate_insight_response()` chains clean → validate → suggestion validation.
 - Exception fallback returns a clean generic sentence instead of raw data summaries.
+- **Safety net in `agent.py`:** All pre-computed insights are passed through `clean_insight_text()` before rendering, ensuring no residual markdown artifacts reach the UI even if a tool accidentally includes formatting.
+
+### 6. Pre-Computed Insight Pattern
+
+For tools with deterministic, mathematically precise outputs, the LLM’s Pass 2 is bypassed entirely. Instead, the tool itself generates a plain-text insight string using the actual computed values.
+
+**Tools using pre-computed insights:**
+- **`forecast_trendline`**: Scope-aware language (e.g., "The Sports division is projected to reach $354,846 by end of 2025") with projected total, monthly range, and growth rate from sklearn regression.
+- **`price_volume_margin`**: Reports top/bottom margin categories, sweet-spot analysis ($80–$140 range), and category count.
+- **`growth_margin_matrix`**: BCG quadrant assignments per division/category with caveats for low-volume entries.
+- **`yoy_comparison`** (brand/region views): Summarizes best/worst performers with specific growth percentages and dollar values.
+
+**How it works:**
+1. The tool returns a 3-tuple: `(fig, summary_df, pre_computed_insight_string)`.
+2. `tool_router()` unpacks the 3-tuple and passes the insight string back to `agent.py`.
+3. `agent.py` checks if the insight string is non-empty. If so, it calls `clean_insight_text()` on it and skips Pass 2 entirely.
+4. The pre-computed insight is rendered directly via `st.html()`.
+
+**Benefits:** Faster response (one LLM call instead of two), zero hallucination risk (numbers come straight from the math), and consistent formatting.
 
 ## Verification
 

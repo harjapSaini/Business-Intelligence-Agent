@@ -38,7 +38,8 @@ def forecast_trendline(
         brand:       Optional pre-filter for BRAND.
 
     Returns:
-        (plotly.Figure, pd.DataFrame) - trend chart + monthly data table.
+        (plotly.Figure, pd.DataFrame, str) - trend chart, monthly data table,
+        and a pre-computed insight string built from the regression output.
     """
     group_col_map = {
         "division": "PRODUCT_DIVISION",
@@ -58,19 +59,14 @@ def forecast_trendline(
 
     # Apply context pre-filters before grouping
     filtered = df.copy()
-    active_filters = []
     if division:
         filtered = filtered[filtered["PRODUCT_DIVISION"] == division]
-        active_filters.append(f"Div: {division}")
     if region:
         filtered = filtered[filtered["REGION"] == region]
-        active_filters.append(f"Reg: {region}")
     if category:
         filtered = filtered[filtered["PRODUCT_CATEGORY"] == category]
-        active_filters.append(f"Cat: {category}")
     if brand:
         filtered = filtered[filtered["BRAND"] == brand]
-        active_filters.append(f"Brand: {brand}")
 
     # Then apply the group_value filter (existing logic)
     if group_value:
@@ -130,14 +126,85 @@ def forecast_trendline(
     forecast_df["upper"] = forecast_df[col] + 1.96 * std_err
     forecast_df["lower"] = forecast_df[col] - 1.96 * std_err
 
-    # Build chart
+    # ── Pre-computed insight from actual regression values ──────────
     metric_label = metric.replace("_", " ").title()
-    # Add group_value to active_filters if present
+    forecast_values = forecast_df[col].values
+    projected_annual = float(forecast_values.sum())
+    jan_2025 = float(forecast_values[0])
+    dec_2025 = float(forecast_values[-1])
+    monthly_growth = (dec_2025 - jan_2025) / jan_2025 * 100 if jan_2025 else 0.0
+
+    # Reference: total of historical months in 2024
+    hist_2024 = monthly.loc[monthly["YEAR"] == 2024, col]
+    ref_annual = float(hist_2024.sum()) if not hist_2024.empty else 0.0
+
+    # Build the insight string — plain text only, no markdown
+    # Determine a human-readable scope label (e.g. "Sports division")
+    scope_parts = []
+    if division:
+        scope_parts.append(f"{division} division")
+    if region:
+        scope_parts.append(f"{region} region")
+    if category:
+        scope_parts.append(f"{category} category")
+    if brand:
+        scope_parts.append(f"brand {brand}")
+    if group_value and not scope_parts:
+        scope_parts.append(group_value)
+    scope_label = ", ".join(scope_parts) if scope_parts else "the business"
+
+    def _fmt(v: float) -> str:
+        """Format large numbers with $, commas, no decimals."""
+        if metric == "margin_rate":
+            return f"{v:.1f}%"
+        return f"${v:,.0f}"
+
+    insight_parts = [
+        f"{scope_label.capitalize()} is projected to reach {_fmt(projected_annual)} "
+        f"in total 2025 {metric_label.lower()}",
+    ]
+    if ref_annual:
+        yoy_change = (projected_annual - ref_annual) / ref_annual * 100
+        direction = "up" if yoy_change >= 0 else "down"
+        insight_parts[0] += (
+            f", {direction} {abs(yoy_change):.1f}% from {_fmt(ref_annual)} in 2024."
+        )
+    else:
+        insight_parts[0] += "."
+    insight_parts.append(
+        f"Monthly {metric_label.lower()} forecast grows from {_fmt(jan_2025)} in January "
+        f"to {_fmt(dec_2025)} by December 2025 (+{monthly_growth:.1f}% within-year growth)."
+    )
+    insight_parts.append(
+        f"The 95% confidence band is +/-{_fmt(1.96 * std_err)}/month, "
+        f"so actual results could vary around these projections."
+    )
+    pre_computed_insight = " ".join(insight_parts)
+
+    # ── Build chart ──────────────────────────────────────────────
+    # Build a clean filter label — avoid duplicates between division & group_value
+    filter_parts = []
+    if division:
+        filter_parts.append(f"Division: {division}")
+    if region:
+        filter_parts.append(f"Region: {region}")
+    if category:
+        filter_parts.append(f"Category: {category}")
+    if brand:
+        filter_parts.append(f"Brand: {brand}")
+    # Only add group_value when it isn't already covered by the named filters
     if group_value:
-        active_filters.append(f"{group_by.title()}: {group_value}")
+        already = (
+            (group_by == "division" and division == group_value)
+            or (group_by == "region" and region == group_value)
+            or (group_by == "category" and category == group_value)
+            or (group_by == "brand" and brand == group_value)
+        )
+        if not already:
+            filter_parts.append(f"{group_by.title()}: {group_value}")
     title_text = f"Forecast - {metric_label}"
-    if active_filters:
-        title_text += f" ({', '.join(active_filters)})"
+    if filter_parts:
+        title_text += f" ({', '.join(filter_parts)})"
     fig = go.Figure()
 
     # Historical line
@@ -183,4 +250,4 @@ def forecast_trendline(
         ignore_index=True,
     )
 
-    return fig, summary_df
+    return fig, summary_df, pre_computed_insight

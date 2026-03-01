@@ -28,6 +28,7 @@ VALID_TOOLS = [
     "price_elasticity",
     "brand_benchmarking",
     "growth_margin_matrix",
+    "out_of_scope",
 ]
 
 # ── Chart colour palette (consistent across all tools) ────────

@@ -237,69 +237,76 @@ def summarize_anomalies(
 
 def summarize_price_volume(result_df: pd.DataFrame) -> str:
     """
-    Summarize price-volume-margin results.
-
-    Identifies pricing sweet spots, highest margin products,
-    and volume leaders.
+    Build a compact text summary of price_volume_margin tool output.
+    Expects category-level aggregated dataframe with columns:
+    PRODUCT_CATEGORY, avg_price, margin_rate, total_units, total_sales
     """
-    if result_df is None or result_df.empty:
-        return "No price-volume data available."
+    try:
+        df = result_df.copy()
 
-    lines = []
+        # Reset index in case PRODUCT_CATEGORY is the index
+        if df.index.name == "PRODUCT_CATEGORY":
+            df = df.reset_index()
 
-    # Overall stats
-    lines.append(f"Total products analyzed: {len(result_df)}")
-    lines.append(f"Price range: ${result_df['avg_price'].min():.2f} to ${result_df['avg_price'].max():.2f}")
-    lines.append(f"Average margin rate: {result_df['margin_rate'].mean():.1%}")
+        # Ensure margin_pct column exists
+        if "margin_pct" not in df.columns:
+            df["margin_pct"] = (df["margin_rate"] * 100).round(1)
 
-    # Highest margin product
-    best_margin = result_df.loc[result_df["margin_rate"].idxmax()]
-    lines.append(
-        f"\nHighest margin: {best_margin['PRODUCT_NAME']} "
-        f"(margin rate: {best_margin['margin_rate']:.1%}, "
-        f"price: ${best_margin['avg_price']:.2f})"
-    )
+        # Sort by margin rate descending
+        df_sorted = df.sort_values("margin_pct", ascending=False)
 
-    # Lowest margin product
-    worst_margin = result_df.loc[result_df["margin_rate"].idxmin()]
-    lines.append(
-        f"Lowest margin: {worst_margin['PRODUCT_NAME']} "
-        f"(margin rate: {worst_margin['margin_rate']:.1%}, "
-        f"price: ${worst_margin['avg_price']:.2f})"
-    )
+        # Top 3 categories by margin
+        top3 = df_sorted.head(3)
+        top3_str = ", ".join(
+            f"{row['PRODUCT_CATEGORY']} ({row['margin_pct']:.1f}%, "
+            f"avg price ${row['avg_price']:.2f})"
+            for _, row in top3.iterrows()
+        )
 
-    # Highest volume product
-    top_volume = result_df.loc[result_df["total_units"].idxmax()]
-    lines.append(
-        f"\nVolume leader: {top_volume['PRODUCT_NAME']} "
-        f"({top_volume['total_units']:,.0f} units, "
-        f"price: ${top_volume['avg_price']:.2f}, "
-        f"margin: {top_volume['margin_rate']:.1%})"
-    )
+        # Bottom 3 categories by margin
+        bot3 = df_sorted.tail(3)
+        bot3_str = ", ".join(
+            f"{row['PRODUCT_CATEGORY']} ({row['margin_pct']:.1f}%, "
+            f"avg price ${row['avg_price']:.2f})"
+            for _, row in bot3.iterrows()
+        )
 
-    # Revenue leader
-    top_revenue = result_df.loc[result_df["total_sales"].idxmax()]
-    lines.append(
-        f"Revenue leader: {top_revenue['PRODUCT_NAME']} "
-        f"(${top_revenue['total_sales']:,.0f} in sales)"
-    )
+        # Best and worst single performers
+        best = df_sorted.iloc[0]
+        worst = df_sorted.iloc[-1]
 
-    # Sweet spot analysis - products with above-average margin AND above-average volume
-    avg_margin = result_df["margin_rate"].mean()
-    avg_units = result_df["total_units"].mean()
-    sweet_spot = result_df[
-        (result_df["margin_rate"] > avg_margin) &
-        (result_df["total_units"] > avg_units)
-    ]
-    if not sweet_spot.empty:
-        lines.append(f"\nSweet spot products (above-avg margin AND volume): {len(sweet_spot)}")
-        for _, row in sweet_spot.head(3).iterrows():
-            lines.append(
-                f"  - {row['PRODUCT_NAME']}: margin {row['margin_rate']:.1%}, "
-                f"{row['total_units']:,.0f} units, ${row['avg_price']:.2f}"
+        # Sweet spot: categories with avg price $80-$140
+        sweet_spot = df[
+            (df["avg_price"] >= 80) & (df["avg_price"] <= 140)
+        ].sort_values("margin_pct", ascending=False)
+
+        sweet_spot_str = "None found"
+        if not sweet_spot.empty:
+            sweet_spot_str = ", ".join(
+                f"{row['PRODUCT_CATEGORY']} ({row['margin_pct']:.1f}%)"
+                for _, row in sweet_spot.head(3).iterrows()
             )
 
-    return "\n".join(lines)
+        summary = (
+            f"Price vs Margin Rate Analysis — {len(df)} categories\n"
+            f"Top margin categories: {top3_str}\n"
+            f"Bottom margin categories: {bot3_str}\n"
+            f"Highest margin: {best['PRODUCT_CATEGORY']} at "
+            f"{best['margin_pct']:.1f}% margin, avg price ${best['avg_price']:.2f}, "
+            f"{best['total_units']:,.0f} units sold\n"
+            f"Lowest margin: {worst['PRODUCT_CATEGORY']} at "
+            f"{worst['margin_pct']:.1f}% margin, avg price ${worst['avg_price']:.2f}, "
+            f"{worst['total_units']:,.0f} units sold\n"
+            f"Sweet spot ($80-$140 price range): {sweet_spot_str}\n"
+            f"Key finding: {worst['PRODUCT_CATEGORY']} is the most concerning — "
+            f"high price (${worst['avg_price']:.2f}) but lowest margin rate "
+            f"({worst['margin_pct']:.1f}%)"
+        )
+
+        return summary
+
+    except Exception as e:
+        return f"Price volume margin analysis complete. Error building summary: {str(e)}"
 
 
 # =====================================================================

@@ -59,22 +59,25 @@ def growth_margin_matrix(
         active_filters.append(f"Brand: {brand}")
 
     # Aggregate by year + group
+    # Use mean of individual MARGIN_RATE values (unweighted) rather
+    # than aggregate MARGIN/SALES (sales-weighted) so that margin
+    # thresholds align with the intuitive per-product average.
     agg = (
         filtered.groupby(["YEAR", group_col])
         .agg(
             SALES=("SALES", "sum"),
             MARGIN=("MARGIN", "sum"),
+            MARGIN_RATE=("MARGIN_RATE", "mean"),
         )
         .reset_index()
     )
-    agg["MARGIN_RATE"] = (agg["MARGIN"] / agg["SALES"]).fillna(0)
 
     years = sorted(agg["YEAR"].unique().tolist())
     if len(years) < 2:
         empty_fig = go.Figure()
         empty_fig.add_annotation(text="Need 2 years of data for growth-margin analysis",
                                  xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-        return empty_fig, pd.DataFrame()
+        return empty_fig, pd.DataFrame(), ""
 
     yr_start, yr_end = years[0], years[-1]
 
@@ -95,8 +98,11 @@ def growth_margin_matrix(
         matrix_records.append({
             "Group": grp,
             f"Sales_{yr_end}": s2,
+            "total_sales": s1 + s2,
             "Margin_Rate": round(mr2, 1),
+            "Margin_Rate_raw": mr2,
             "YoY_Growth%": round(growth, 1),
+            "YoY_Growth_raw": growth,
         })
 
     matrix_df = pd.DataFrame(matrix_records)
@@ -104,16 +110,19 @@ def growth_margin_matrix(
         empty_fig = go.Figure()
         empty_fig.add_annotation(text="Not enough data for matrix",
                                  xref="paper", yref="paper", x=0.5, y=0.5, showarrow=False)
-        return empty_fig, pd.DataFrame()
+        return empty_fig, pd.DataFrame(), ""
 
-    # Quadrant thresholds (data-driven medians)
-    med_growth = matrix_df["YoY_Growth%"].median()
-    med_margin = matrix_df["Margin_Rate"].median()
+    # Quadrant thresholds — round the mean to 1 decimal so that
+    # the threshold precision matches the individual rounded values.
+    # This prevents sub-0.1% floating-point noise from flipping
+    # borderline divisions (e.g. Tools at 50.2% vs threshold 50.2%).
+    growth_threshold = round(float(matrix_df["YoY_Growth_raw"].mean()), 1)
+    margin_threshold = round(float(matrix_df["Margin_Rate_raw"].mean()), 1)
 
-    # Assign quadrant
-    def assign_quadrant(row):
-        high_growth = row["YoY_Growth%"] >= med_growth
-        high_margin = row["Margin_Rate"] >= med_margin
+    # Assign quadrant using mean thresholds (>= for boundary cases)
+    def assign_quadrant(row) -> str:
+        high_growth = row["YoY_Growth%"] >= growth_threshold
+        high_margin = row["Margin_Rate"] >= margin_threshold
         if high_growth and high_margin:
             return "Stars"
         elif not high_growth and high_margin:
@@ -124,6 +133,55 @@ def growth_margin_matrix(
             return "Dogs"
 
     matrix_df["Quadrant"] = matrix_df.apply(assign_quadrant, axis=1)
+
+    # ── Build pre-computed insight from actual quadrant data ──
+    divisions = [
+        {"name": row["Group"], "quadrant": row["Quadrant"],
+         "growth": row["YoY_Growth%"], "margin": row["Margin_Rate"],
+         "sales": row[f"Sales_{yr_end}"],
+         "total_sales": row["total_sales"]}
+        for _, row in matrix_df.iterrows()
+    ]
+
+    stars = [d for d in divisions if d["quadrant"] == "Stars"]
+    dogs = [d for d in divisions if d["quadrant"] == "Dogs"]
+    question_marks = [d for d in divisions if d["quadrant"] == "Question Marks"]
+    cash_cows = [d for d in divisions if d["quadrant"] == "Cash Cows"]
+
+    star_names = ", ".join(d["name"] for d in stars) or "None"
+    dog_names = ", ".join(d["name"] for d in dogs) or "None"
+
+    insight_parts = []
+    insight_parts.append(
+        f"{star_names} lead as Stars with high growth and strong margins."
+    )
+    if dogs:
+        worst_dog = min(dogs, key=lambda d: d["growth"])
+        insight_parts.append(
+            f"{worst_dog['name']} is the key Dog — declining at "
+            f"{worst_dog['growth']:+.1f}% and below-average margins, "
+            f"warranting an urgent portfolio review."
+        )
+    if question_marks:
+        top_qm = max(question_marks, key=lambda d: d["growth"])
+        insight_parts.append(
+            f"{top_qm['name']} shows the highest growth at "
+            f"{top_qm['growth']:+.1f}% but below-average margins, "
+            f"making it a Question Mark where margin improvement is the "
+            f"strategic priority."
+        )
+
+    # Flag small-scale Stars (Food caveat) — use total_sales across
+    # both years so the figure reflects full business scale.
+    for d in stars:
+        if d["total_sales"] < 200_000:
+            insight_parts.append(
+                f"Note: {d['name']} is classified as a Star but represents "
+                f"only ${d['total_sales'] / 1000:.0f}K in total sales — growth "
+                f"potential exists but scale is limited."
+            )
+
+    pre_computed_insight = " ".join(insight_parts)
 
     # Build bubble chart
     filter_text = f" ({', '.join(active_filters)})" if active_filters else ""
@@ -160,9 +218,9 @@ def growth_margin_matrix(
             ),
         ))
 
-    # Quadrant lines
-    fig.add_hline(y=med_growth, line_dash="dash", line_color="gray", opacity=0.5)
-    fig.add_vline(x=med_margin, line_dash="dash", line_color="gray", opacity=0.5)
+    # Quadrant lines at mean thresholds
+    fig.add_hline(y=growth_threshold, line_dash="dash", line_color="gray", opacity=0.5)
+    fig.add_vline(x=margin_threshold, line_dash="dash", line_color="gray", opacity=0.5)
 
     # Quadrant labels in corners
     annotations = [
@@ -195,8 +253,8 @@ def growth_margin_matrix(
         legend_title_text="Quadrant",
     )
 
-    # Summary table
-    summary_df = matrix_df[["Group", f"Sales_{yr_end}", "Margin_Rate", "YoY_Growth%", "Quadrant"]]
+    # Summary table (display-friendly rounded columns only)
+    summary_df = matrix_df[["Group", f"Sales_{yr_end}", "Margin_Rate", "YoY_Growth%", "Quadrant"]].copy()
     summary_df = summary_df.sort_values("Quadrant").reset_index(drop=True)
 
-    return fig, summary_df
+    return fig, summary_df, pre_computed_insight

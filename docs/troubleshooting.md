@@ -59,6 +59,17 @@ pip install -r requirements.txt
 
 ---
 
+### Agent says my question is out of scope but it shouldn't be
+
+**Cause:** The keyword guard in `validate_routing()` detected a word that overlaps with out-of-scope topics (e.g., "stock" in "stock level" vs. a brand name containing "stock").
+
+**Fix:** Rephrase to avoid triggering keywords like "customer", "inventory", "stock level", "competitor", "market share", "retention", "churn", "AOV". For example:
+
+- ❌ "What is the customer count?" → triggers out_of_scope
+- ✅ "Show total units sold by region" → routes correctly
+
+---
+
 ### "Mixed type column names" warning
 
 **Cause:** Some DataFrames used for the heatmap have numeric year columns alongside string columns.
@@ -105,6 +116,14 @@ taskkill /PID <PID> /F
 **Cause:** This is intentional. The toggle is disabled during response processing to prevent the UI from resetting and cancelling the in-progress analysis.
 
 **Fix:** Wait for the current response to finish, then toggle the theme.
+
+---
+
+### First forecast question is very slow
+
+**Cause:** The `forecast_trendline` tool imports `sklearn.linear_model.LinearRegression`. On OneDrive-synced paths, this first import can take 20–40 seconds due to file I/O overhead. Subsequent forecast questions are fast because the module is already cached in memory.
+
+**Fix:** This is a known limitation of running Python projects from OneDrive-synced directories. For faster performance, consider cloning the project to a local (non-synced) directory.
 
 ---
 

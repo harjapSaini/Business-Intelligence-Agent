@@ -111,6 +111,14 @@ def yoy_comparison(
         labels={col: metric_label, group_col: group_col.replace("_", " ").title()},
         color_discrete_map=YOY_COLORS,
     )
+
+    # Sort bars by 2024 value ascending so worst performers appear on the left
+    if 2024 in pivot.columns:
+        sort_order = pivot.sort_values(2024, ascending=True).index.tolist()
+        fig.update_layout(
+            xaxis={"categoryorder": "array", "categoryarray": sort_order},
+        )
+
     fig.update_layout(
         template="plotly_dark" if _is_dark_mode else "plotly_white",
         paper_bgcolor="rgba(0,0,0,0)",

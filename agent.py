@@ -12,7 +12,7 @@ import streamlit as st
 
 from config import DATA_PATH
 from data_loader import load_data, get_dataset_summary
-from ollama_client import verify_ollama, warmup_model, ask_llm, generate_insight
+from ollama_client import verify_ollama, warmup_model, ask_llm, generate_insight, clean_insight_text
 from tools import tool_router
 from insight_builder import build_data_summary
 from ui import (
@@ -100,6 +100,58 @@ def update_memory(tool_name: str, filters: dict, insight: str, result_df=None) -
 
 
 # =====================================================================
+#  OUT-OF-SCOPE HANDLER
+# =====================================================================
+
+def build_out_of_scope_message(question: str, filters: dict) -> str:
+    """
+    Generates a helpful explanation when the question cannot be
+    answered with the available dataset.
+    """
+    q = question.lower()
+
+    if any(w in q for w in ["average order value", "aov", "order value"]):
+        return (
+            "Average Order Value cannot be calculated from this dataset "
+            "because there is no customer or order identifier — each row "
+            "represents a product-store-date transaction, not a customer order. "
+            "To calculate AOV, a customer transaction ID linking multiple "
+            "products per purchase would be needed. "
+            "I can show you average selling price per unit by division or "
+            "region instead — would that be helpful?"
+        )
+    elif any(w in q for w in ["customer", "customers"]):
+        return (
+            "Customer-level data is not available in this dataset. "
+            "The data contains product sales by store and date but does "
+            "not include customer identifiers, loyalty data, or purchase "
+            "frequency. I can analyze performance by store, region, or "
+            "division instead."
+        )
+    elif any(w in q for w in ["inventory", "stock"]):
+        return (
+            "Inventory and stock level data is not included in this dataset. "
+            "Only sales transactions and product costs are available. "
+            "I can show sales trends or margin analysis that may indicate "
+            "supply or demand patterns."
+        )
+    elif any(w in q for w in ["competitor", "market share"]):
+        return (
+            "Competitor and external market data is not available in this "
+            "dataset. All analysis is limited to internal sales and margin "
+            "data. I can show relative brand performance within this "
+            "organization instead."
+        )
+    else:
+        return (
+            "This question cannot be answered with the available data. "
+            "The dataset contains sales transactions, product costs, "
+            "store information, and calendar data only. "
+            "Try asking about sales, margins, brands, divisions, or regions."
+        )
+
+
+# =====================================================================
 #  PROCESS A QUESTION (TWO-PASS LLM PIPELINE)
 # =====================================================================
 
@@ -142,8 +194,34 @@ def process_question(question: str, df, summary: dict, is_dark_mode: bool = Fals
     # Store theme info in filters so router can pass it to tools
     filters["_is_dark_mode"] = is_dark_mode
 
+    # ── Handle out-of-scope questions ───────────────────────
+    if tool_name == "out_of_scope":
+        insight = build_out_of_scope_message(question, filters)
+        suggestions = [
+            "How is the business performing overall?",
+            "Which division grew the most year over year?",
+            "Show me the top brands by sales",
+        ]
+        assistant_msg = {
+            "role": "assistant",
+            "tool": "out_of_scope",
+            "insight": insight,
+            "suggestions": suggestions,
+            "figure": None,
+            "summary_df": None,
+            "callouts": None,
+        }
+        st.session_state.messages.append(assistant_msg)
+        return
+
     # ── Run the tool ────────────────────────────────────────
     fig, result_df, callouts = tool_router(tool_name, filters, df)
+
+    # ── Check for pre-computed insight (bypasses Pass 2) ───
+    pre_computed_insight = None
+    if isinstance(callouts, str) and callouts.strip():
+        pre_computed_insight = clean_insight_text(callouts)  # safety net
+        callouts = None  # Reset so it's not treated as anomaly callouts
 
     # ── Build compact data summary for Pass 2 ──────────────
     metric = filters.get("metric", "sales")
@@ -162,7 +240,18 @@ def process_question(question: str, df, summary: dict, is_dark_mode: bool = Fals
     filter_context = ", ".join(active) if active else ""
 
     # ── Pass 2: Generate data-driven insight ────────────────
-    insight_response = generate_insight(question, tool_name, data_summary, filter_context)
+    if pre_computed_insight:
+        # Tool provided its own insight — skip LLM Pass 2
+        insight_response = {
+            "insight": pre_computed_insight,
+            "suggestions": [
+                "Which division grew the most year over year?",
+                "Show me the margin waterfall by division",
+                "What does the forecast look like for Sports?",
+            ],
+        }
+    else:
+        insight_response = generate_insight(question, tool_name, data_summary, filter_context)
 
     # ── Update session memory ───────────────────────────────
     update_memory(tool_name, filters, insight_response["insight"], result_df)

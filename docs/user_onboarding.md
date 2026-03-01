@@ -47,7 +47,7 @@ _Example Queries:_
 
 When the agent responds, it provides:
 
-- A text insight highlighting the most important numbers.
+- A text insight highlighting the most important numbers. For some tools (forecast, pricing analysis, growth matrix), the insight is pre-computed directly from the math — meaning it's instant and contains the exact calculated values with zero LLM hallucination risk.
 - A **badge** indicating which mathematical tool it selected to answer you.
 - An interactive **Plotly Chart** (you can hover, zoom, and pan).
 - A collapsable **View Data Table** to see the raw numbers backing the chart.
@@ -63,14 +63,24 @@ While the agent is processing your question:
 - **Follow-up suggestion buttons** and **welcome screen buttons** are disabled to prevent double-submissions.
 - The **Dark Mode toggle** is temporarily locked to prevent UI resets.
 
-#### 4. Session Memory
+#### 4. Out-of-Scope Questions
+
+If you ask about data that is **not in the dataset** — such as customer counts, average order values, inventory levels, competitor benchmarks, website traffic, or employee data — the agent will:
+
+- Show an **info box** explaining why it cannot answer (no chart or tool badge is displayed).
+- Provide a **specific reason** (e.g., "The dataset tracks product-level revenue and margin, not individual transactions or customer identifiers").
+- Suggest **3 alternative questions** you can ask instead.
+
+This is intentional — the agent only analyses the data it has rather than hallucinating answers.
+
+#### 5. Session Memory
 
 The agent **remembers your context**.
 If you ask, _"How did Sports perform?"_ and then say _"What about in the West?"_, the agent remembers you are still talking about the Sports division and filters accordingly.
 
 **To reset memory:** Click the "🗑️ Clear Conversation" button in the sidebar.
 
-#### 5. UI Controls
+#### 6. UI Controls
 
 - Use the **🌙 Dark Mode** switch in the sidebar to toggle themes (disabled during loading).
 - View the **📊 Dataset Overview** in the sidebar to understand the total scale and current KPIs of the loaded dataset.

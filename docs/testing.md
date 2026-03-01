@@ -2,7 +2,7 @@
 
 ## Test Summary
 
-All 7 phases have been verified for mathematical accuracy, UI robustness, and LLM reliability.
+All 7 phases and subsequent tool refinements have been verified for mathematical accuracy, UI robustness, and LLM reliability.
 
 | Phase                     | Tests / Verification | Result |
 | ------------------------- | -------------------- | ------ |
@@ -15,6 +15,7 @@ All 7 phases have been verified for mathematical accuracy, UI robustness, and LL
 | Phase 7 - Two-Pass LLM    | Browser Subagent     | ✅     |
 | Routing Hardening         | Manual + Unit        | ✅     |
 | UX Polish                 | Manual               | ✅     |
+| Tool Refinement           | Manual + Unit        | ✅     |
 
 ## Phase 1 Tests
 
@@ -33,7 +34,7 @@ All 7 phases have been verified for mathematical accuracy, UI robustness, and LL
 - YoY summary has Change % column
 - Forecast produces 12 forecast rows
 - Anomaly detection generates callout strings
-- PVM handles multi-filter (division + category)
+- PVM aggregates to category level (12 bubbles, not 200+ products) with sweet spot vrect annotation
 - Store performance returns top/bottom N stores with size trendline
 - Seasonality trends overlays 2023 vs 2024 by month and quarter
 - Division mix produces side-by-side donut charts with share shift
@@ -41,8 +42,8 @@ All 7 phases have been verified for mathematical accuracy, UI robustness, and LL
 - KPI scorecard returns RAG-status table for all divisions (no filters)
 - Price elasticity computes arc elasticity and log-log regression per category
 - Brand benchmarking generates 100% stacked bar with margin overlay
-- Growth-margin matrix plots BCG-style 2×2 bubble chart with quadrant labels
-- Tool router dispatches all 13 tools correctly
+- Growth-margin matrix plots BCG-style 2×2 bubble chart with quadrant labels using mean-based MARGIN_RATE and rounded thresholds
+- Tool router dispatches all 14 tools correctly (13 analysis + out_of_scope)
 - Router handles unknown tools (fallback)
 - Router normalises `"None"` and `"null"` filter strings
 
@@ -96,9 +97,23 @@ All 7 phases have been verified for mathematical accuracy, UI robustness, and LL
 - Execution sequence verified: LLM Router -> Routing Safety Net -> Tool Processing -> Data Summarization -> LLM Insight (Pass 2).
 - LLM narrations explicitly quote numbers, brands, and percentages from the tool output, eliminating generic hallucinations.
 - `validate_routing()` correctly routes brand+YoY overlap questions (e.g., "Which brand grew the most year over year?" → `yoy_comparison`, not `brand_region_crosstab`).
+- `validate_routing()` correctly identifies out-of-scope questions (AOV, customer count, inventory, competitor data) and routes to `out_of_scope`.
+- Out-of-scope questions show explanatory text with no chart, no tool badge, and an info box.
+- Normal in-scope questions (e.g., "Show me sales by division") are NOT false-positived into out_of_scope.
 - `extract_missing_filters()` correctly infers `group_by` from keywords: "brand" → brand, "region" (without filter) → region, default → division.
 - `clean_insight_text()` strips all markdown formatting; `validate_insight_format()` catches structured data leaks.
+- `clean_insight_text()` safety net in `agent.py` strips residual markdown from all pre-computed insights before rendering.
 - Insight text renders cleanly via `st.html()` with no backtick or code-span artifacts.
+- Pre-computed insights bypass Pass 2 LLM correctly for forecast, PVM, growth matrix, and YoY brand/region tools.
+
+## Tool Refinement Tests
+
+- **Forecast Trendline**: Returns 3-tuple with pre-computed plain-text insight. Chart title uses deduplicated `filter_parts` (no more "Div: X, Division: X"). Scope-aware insight text verified (e.g., "The Sports division is projected to reach $354,846"). No markdown artifacts in insight text.
+- **Price-Volume-Margin**: Category-level aggregation verified — 12 bubbles (one per product category, not 200+ individual products). Sweet spot vrect annotation ($80–$140) renders correctly. Pre-computed insight text correctly reports Snacks (55.5%) as top margin, Shirts (43.2%) as worst, and Decor/Safety Gear in the sweet spot.
+- **Growth-Margin Matrix**: Quadrant classification verified — Sports = Question Mark, Food = Star, Gardening = Cash Cow, Apparel = Dog, Tools = Cash Cow. Tools correctly classified as Cash Cow (50.2% margin ≥ 50.2% threshold) after switching to unweighted mean `MARGIN_RATE` aggregation and rounding thresholds to 1 decimal. Food sales correctly shows "$83K in total sales" (both years combined, not just 2024).
+- **YoY Comparison**: Bars sorted ascending by 2024 value — worst performers on the left, best on the right. Verified for all `group_by` values (brand, division, region, category).
+- **Agent Pre-Computed Insight Safety Net**: `clean_insight_text()` imported from `ollama_client` and applied to all pre-computed insights in `agent.py` before rendering. Verified no markdown passes through.
+- **Insight Builder (PVM)**: `summarize_price_volume()` rewritten for category-level schema (`PRODUCT_CATEGORY`, `avg_price`, `margin_rate`, `total_units`, `total_sales`, `margin_pct`). No KeyError on `PRODUCT_NAME`. Reports top/bottom 3 categories and sweet-spot analysis.
 
 ## Running Tests
 

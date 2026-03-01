@@ -620,14 +620,18 @@ def render_chat_message(msg: dict, msg_idx: int = 0, is_dark: bool = False) -> N
                     f"{insight}</p>"
                 )
 
-            # Tool badge
+            # Tool badge (skip for out_of_scope)
             tool = msg.get("tool", "")
-            if tool:
+            if tool and tool != "out_of_scope":
                 tool_label = tool.replace("_", " ").title()
                 st.markdown(
                     f'<span class="tool-badge">📊 {tool_label}</span>',
                     unsafe_allow_html=True,
                 )
+
+            # Out-of-scope info box
+            if tool == "out_of_scope":
+                st.info("💡 This question requires data not available in the current dataset.")
 
             # Anomaly callouts (before chart for context)
             callouts = msg.get("callouts")
